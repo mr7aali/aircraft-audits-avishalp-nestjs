@@ -13,19 +13,999 @@ datasource db {
   provider = "postgresql"
 }
 
+// generator client {
+//   provider = "prisma-client-js"
+// }
 
-model User {
-  id    Int     @id @default(autoincrement())
-  email String  @unique
-  name  String?
-  posts Post[]
+// datasource db {
+//   provider = "postgresql"
+//   url      = env("DATABASE_URL")
+// }
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  LOCKED
 }
 
-model Post {
-  id        Int      @id @default(autoincrement())
-  title     String
-  content   String?
-  published Boolean? @default(false)
-  author    User?    @relation(fields: [authorId], references: [id])
-  authorId  Int?
+enum RecoveryType {
+  PASSWORD_RESET
+  UID_RECOVERY
+}
+
+enum RecoveryStatus {
+  REQUESTED
+  SENT
+  COMPLETED
+  EXPIRED
+  FAILED
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum FileCategory {
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+  SIGNATURE
+}
+
+enum ScanStatus {
+  PENDING
+  CLEAN
+  INFECTED
+  FAILED
+}
+
+enum AuditRecordStatus {
+  DRAFT
+  SUBMITTED
+}
+
+enum YesNoNa {
+  YES
+  NO
+  NA
+}
+
+enum PassFail {
+  PASS
+  FAIL
+}
+
+enum DelayType {
+  PRIMARY
+  SECONDARY
+}
+
+enum RatingScale {
+  VERY_POOR
+  POOR
+  FAIR
+  GOOD
+  VERY_GOOD
+}
+
+enum ConversationType {
+  DIRECT
+  GROUP
+}
+
+enum ConversationMemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  AUDIO
+  DOCUMENT
+  VIDEO
+  LOCATION
+  CONTACT
+  POLL
+  EVENT
+  SYSTEM
+}
+
+enum AttachmentKind {
+  IMAGE
+  AUDIO
+  DOCUMENT
+  VIDEO
+}
+
+enum LocationType {
+  CURRENT
+  LIVE
+  SEARCHED
+}
+
+enum CallType {
+  VIDEO
+  VOICE
+}
+
+model Role {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  stationAccesses UserStationAccess[]
+  moduleAccesses  RoleModuleAccess[]
+
+  @@map("roles")
+}
+
+model User {
+  id                 String     @id @default(uuid()) @db.Uuid
+  uid                String     @unique
+  email              String     @unique
+  passwordHash       String
+  firstName          String
+  lastName           String
+  phone              String?
+  profileImageFileId String?    @db.Uuid
+  publishedAt        DateTime?
+  status             UserStatus @default(ACTIVE)
+  failedLoginCount   Int        @default(0)
+  lockedUntil        DateTime?
+  lastSeenAt         DateTime?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  profileImageFile             File?                         @relation("UserProfileImage", fields: [profileImageFileId], references: [id], onDelete: SetNull)
+  stationAccesses              UserStationAccess[]
+  authSessions                 AuthSession[]
+  accountRecoveryRequests      AccountRecoveryRequest[]
+  emailNotifications           EmailNotification[]
+  loginAuditLogs               LoginAuditLog[]
+  uploadedFiles                File[]                        @relation("UserUploadedFiles")
+  cabinQualityAudits           CabinQualityAudit[]
+  lavSafetyObservations        LavSafetyObservation[]
+  cabinSecuritySearchTrainings CabinSecuritySearchTraining[]
+  endOfShiftReports            EndOfShiftReport[]
+  ledOneOnOnes                 EmployeeOneOnOne[]            @relation("LeaderOneOnOnes")
+  attendedOneOnOnes            EmployeeOneOnOne[]            @relation("EmployeeOneOnOnes")
+  feedbacks                    AppFeedback[]
+  createdChatConversations     ChatConversation[]            @relation("ChatConversationCreatedBy")
+  chatParticipants             ChatConversationParticipant[]
+  sentChatMessages             ChatMessage[]                 @relation("ChatMessageSender")
+  chatReceipts                 ChatMessageReceipt[]          @relation("ChatMessageRecipient")
+  chatPollVotes                ChatPollVote[]
+
+  @@index([firstName, lastName])
+  @@map("users")
+}
+
+model Station {
+  id          String   @id @default(uuid()) @db.Uuid
+  code        String   @unique
+  airportCode String?
+  name        String
+  timezone    String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  gates                        Gate[]
+  userAccesses                 UserStationAccess[]
+  shiftDefinitions             ShiftDefinition[]
+  shiftOccurrences             ShiftOccurrence[]
+  authSessions                 AuthSession[]
+  cabinQualityAudits           CabinQualityAudit[]
+  lavSafetyObservations        LavSafetyObservation[]
+  cabinSecuritySearchTrainings CabinSecuritySearchTraining[]
+  endOfShiftReports            EndOfShiftReport[]
+  employeeOneOnOnes            EmployeeOneOnOne[]
+  feedbacks                    AppFeedback[]
+  chatConversations            ChatConversation[]
+
+  @@map("stations")
+}
+
+model Gate {
+  id        String   @id @default(uuid()) @db.Uuid
+  stationId String   @db.Uuid
+  gateCode  String
+  name      String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  station                      Station                       @relation(fields: [stationId], references: [id], onDelete: Restrict)
+  cabinQualityAudits           CabinQualityAudit[]
+  lavSafetyObservations        LavSafetyObservation[]
+  cabinSecuritySearchTrainings CabinSecuritySearchTraining[]
+
+  @@unique([stationId, gateCode])
+  @@index([stationId])
+  @@map("gates")
+}
+
+model UserStationAccess {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  stationId String   @db.Uuid
+  roleId    String   @db.Uuid
+  isDefault Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  station Station @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  role    Role    @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, stationId])
+  @@index([stationId, roleId])
+  @@map("user_station_access")
+}
+
+model AppModule {
+  id   String @id @default(uuid()) @db.Uuid
+  code String @unique
+  name String
+
+  roleAccesses RoleModuleAccess[]
+
+  @@map("app_modules")
+}
+
+model RoleModuleAccess {
+  id        String  @id @default(uuid()) @db.Uuid
+  roleId    String  @db.Uuid
+  moduleId  String  @db.Uuid
+  canList   Boolean @default(false)
+  canView   Boolean @default(false)
+  canCreate Boolean @default(false)
+
+  role   Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  module AppModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, moduleId])
+  @@map("role_module_access")
+}
+
+model ShiftDefinition {
+  id                 String  @id @default(uuid()) @db.Uuid
+  stationId          String  @db.Uuid
+  code               String
+  name               String
+  startsLocalMinutes Int
+  endsLocalMinutes   Int
+  isActive           Boolean @default(true)
+
+  station     Station           @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  occurrences ShiftOccurrence[]
+
+  @@unique([stationId, code])
+  @@map("shift_definitions")
+}
+
+model ShiftOccurrence {
+  id                String   @id @default(uuid()) @db.Uuid
+  stationId         String   @db.Uuid
+  shiftDefinitionId String   @db.Uuid
+  businessDate      DateTime @db.Date
+  startsAt          DateTime
+  endsAt            DateTime
+
+  station                      Station                       @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  shiftDefinition              ShiftDefinition               @relation(fields: [shiftDefinitionId], references: [id], onDelete: Cascade)
+  cabinQualityAudits           CabinQualityAudit[]
+  lavSafetyObservations        LavSafetyObservation[]
+  cabinSecuritySearchTrainings CabinSecuritySearchTraining[]
+  endOfShiftReports            EndOfShiftReport[]
+
+  @@unique([stationId, shiftDefinitionId, businessDate])
+  @@index([stationId, businessDate])
+  @@map("shift_occurrences")
+}
+
+model CleanType {
+  id        String  @id @default(uuid()) @db.Uuid
+  code      String  @unique
+  name      String
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  cabinQualityAudits CabinQualityAudit[]
+
+  @@map("clean_types")
+}
+
+model File {
+  id               String       @id @default(uuid()) @db.Uuid
+  storageKey       String       @unique
+  originalFileName String
+  mimeType         String
+  sizeBytes        BigInt
+  checksumSha256   String?
+  fileCategory     FileCategory
+  scanStatus       ScanStatus   @default(PENDING)
+  encryptedAtRest  Boolean      @default(false)
+  uploadedByUserId String?      @db.Uuid
+  createdAt        DateTime     @default(now())
+
+  uploadedByUser                       User?                                   @relation("UserUploadedFiles", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  userProfileImageFor                  User[]                                  @relation("UserProfileImage")
+  cabinQualitySignatureFor             CabinQualityAudit[]                     @relation("CabinQualityAuditSignature")
+  cabinQualityResponseLinks            CabinQualityAuditResponseFile[]
+  cabinQualityAuditLinks               CabinQualityAuditFile[]
+  lavSafetySignatureFor                LavSafetyObservation[]                  @relation("LavSafetyObservationSignature")
+  lavSafetyResponseLinks               LavSafetyObservationResponseFile[]
+  lavSafetyObservationLinks            LavSafetyObservationFile[]
+  securityTrainingResultLinks          CabinSecuritySearchTrainingResultFile[]
+  securityTrainingLinks                CabinSecuritySearchTrainingFile[]
+  endOfShiftReportLinks                EndOfShiftReportFile[]
+  employeeOneOnOneAudioFor             EmployeeOneOnOne[]                      @relation("EmployeeOneOnOneAudio")
+  employeeOneOnOneEmployeeSignatureFor EmployeeOneOnOne[]                      @relation("EmployeeOneOnOneEmployeeSignature")
+  employeeOneOnOneLeaderSignatureFor   EmployeeOneOnOne[]                      @relation("EmployeeOneOnOneLeaderSignature")
+  chatConversationAvatarFor            ChatConversation[]                      @relation("ChatConversationAvatar")
+  chatMessageFileLinks                 ChatMessageFile[]
+
+  @@index([uploadedByUserId])
+  @@index([fileCategory, scanStatus])
+  @@map("files")
+}
+
+model AuthSession {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @db.Uuid
+  activeStationId  String?   @db.Uuid
+  refreshTokenHash String    @unique
+  rememberMe       Boolean   @default(false)
+  deviceId         String?
+  deviceName       String?
+  ipAddress        String?
+  userAgent        String?
+  expiresAt        DateTime
+  lastUsedAt       DateTime?
+  revokedAt        DateTime?
+  createdAt        DateTime  @default(now())
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activeStation Station? @relation(fields: [activeStationId], references: [id], onDelete: SetNull)
+
+  @@index([userId, expiresAt])
+  @@index([activeStationId])
+  @@map("auth_sessions")
+}
+
+model AccountRecoveryRequest {
+  id             String         @id @default(uuid()) @db.Uuid
+  userId         String?        @db.Uuid
+  requestedEmail String
+  recoveryType   RecoveryType
+  tokenHash      String?        @unique
+  expiresAt      DateTime?
+  consumedAt     DateTime?
+  status         RecoveryStatus @default(REQUESTED)
+  requestedIp    String?
+  createdAt      DateTime       @default(now())
+
+  user          User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  notifications EmailNotification[]
+
+  @@index([requestedEmail, createdAt])
+  @@map("account_recovery_requests")
+}
+
+model EmailNotification {
+  id                String             @id @default(uuid()) @db.Uuid
+  requestId         String?            @db.Uuid
+  userId            String?            @db.Uuid
+  emailTo           String
+  templateCode      String
+  subject           String
+  payloadJson       Json?
+  providerMessageId String?            @unique
+  status            NotificationStatus @default(PENDING)
+  sentAt            DateTime?
+  failedAt          DateTime?
+  createdAt         DateTime           @default(now())
+
+  request AccountRecoveryRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  user    User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+  @@map("email_notifications")
+}
+
+model LoginAuditLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String?  @db.Uuid
+  attemptedUid  String
+  success       Boolean
+  failureReason String?
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([attemptedUid, createdAt])
+  @@index([userId, createdAt])
+  @@map("login_audit_logs")
+}
+
+model CabinQualityChecklistItem {
+  id        String  @id @default(uuid()) @db.Uuid
+  code      String  @unique
+  label     String
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  responses CabinQualityAuditResponse[]
+
+  @@map("cabin_quality_checklist_items")
+}
+
+model CabinQualityAudit {
+  id                  String            @id @default(uuid()) @db.Uuid
+  stationId           String            @db.Uuid
+  shiftOccurrenceId   String?           @db.Uuid
+  gateId              String            @db.Uuid
+  cleanTypeId         String            @db.Uuid
+  auditorUserId       String            @db.Uuid
+  auditorNameSnapshot String
+  auditorRoleSnapshot String
+  gateCodeSnapshot    String
+  cleanTypeSnapshot   String
+  auditAt             DateTime          @default(now())
+  otherFindings       String?
+  additionalNotes     String?
+  signatureFileId     String            @db.Uuid
+  status              AuditRecordStatus @default(SUBMITTED)
+  submittedAt         DateTime          @default(now())
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  station         Station                     @relation(fields: [stationId], references: [id], onDelete: Restrict)
+  shiftOccurrence ShiftOccurrence?            @relation(fields: [shiftOccurrenceId], references: [id], onDelete: SetNull)
+  gate            Gate                        @relation(fields: [gateId], references: [id], onDelete: Restrict)
+  cleanType       CleanType                   @relation(fields: [cleanTypeId], references: [id], onDelete: Restrict)
+  auditorUser     User                        @relation(fields: [auditorUserId], references: [id], onDelete: Restrict)
+  signatureFile   File                        @relation("CabinQualityAuditSignature", fields: [signatureFileId], references: [id], onDelete: Restrict)
+  responses       CabinQualityAuditResponse[]
+  files           CabinQualityAuditFile[]
+
+  @@index([stationId, auditAt])
+  @@index([auditorUserId])
+  @@index([gateId])
+  @@index([status])
+  @@map("cabin_quality_audits")
+}
+
+model CabinQualityAuditResponse {
+  id              String  @id @default(uuid()) @db.Uuid
+  auditId         String  @db.Uuid
+  checklistItemId String  @db.Uuid
+  response        YesNoNa
+
+  audit         CabinQualityAudit               @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  checklistItem CabinQualityChecklistItem       @relation(fields: [checklistItemId], references: [id], onDelete: Restrict)
+  files         CabinQualityAuditResponseFile[]
+
+  @@unique([auditId, checklistItemId])
+  @@index([checklistItemId])
+  @@map("cabin_quality_audit_responses")
+}
+
+model CabinQualityAuditResponseFile {
+  responseId String @db.Uuid
+  fileId     String @db.Uuid
+  sortOrder  Int    @default(0)
+
+  response CabinQualityAuditResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  file     File                      @relation(fields: [fileId], references: [id], onDelete: Restrict)
+
+  @@id([responseId, fileId])
+  @@index([fileId])
+  @@map("cabin_quality_audit_response_files")
+}
+
+model CabinQualityAuditFile {
+  auditId   String @db.Uuid
+  fileId    String @db.Uuid
+  sortOrder Int    @default(0)
+
+  audit CabinQualityAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  file  File              @relation(fields: [fileId], references: [id], onDelete: Restrict)
+
+  @@id([auditId, fileId])
+  @@index([fileId])
+  @@map("cabin_quality_audit_files")
+}
+
+model LavSafetyChecklistItem {
+  id        String  @id @default(uuid()) @db.Uuid
+  code      String  @unique
+  label     String
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  responses LavSafetyObservationResponse[]
+
+  @@map("lav_safety_checklist_items")
+}
+
+model LavSafetyObservation {
+  id                  String            @id @default(uuid()) @db.Uuid
+  stationId           String            @db.Uuid
+  shiftOccurrenceId   String?           @db.Uuid
+  gateId              String            @db.Uuid
+  auditorUserId       String            @db.Uuid
+  auditorNameSnapshot String
+  auditorRoleSnapshot String
+  gateCodeSnapshot    String
+  observedAt          DateTime          @default(now())
+  driverName          String
+  shipNumber          String
+  otherFindings       String?
+  additionalNotes     String?
+  signatureFileId     String            @db.Uuid
+  status              AuditRecordStatus @default(SUBMITTED)
+  submittedAt         DateTime          @default(now())
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  station         Station                        @relation(fields: [stationId], references: [id], onDelete: Restrict)
+  shiftOccurrence ShiftOccurrence?               @relation(fields: [shiftOccurrenceId], references: [id], onDelete: SetNull)
+  gate            Gate                           @relation(fields: [gateId], references: [id], onDelete: Restrict)
+  auditorUser     User                           @relation(fields: [auditorUserId], references: [id], onDelete: Restrict)
+  signatureFile   File                           @relation("LavSafetyObservationSignature", fields: [signatureFileId], references: [id], onDelete: Restrict)
+  responses       LavSafetyObservationResponse[]
+  files           LavSafetyObservationFile[]
+
+  @@index([stationId, observedAt])
+  @@index([auditorUserId])
+  @@index([driverName])
+  @@index([status])
+  @@map("lav_safety_observations")
+}
+
+model LavSafetyObservationResponse {
+  id              String   @id @default(uuid()) @db.Uuid
+  observationId   String   @db.Uuid
+  checklistItemId String   @db.Uuid
+  response        PassFail
+
+  observation   LavSafetyObservation               @relation(fields: [observationId], references: [id], onDelete: Cascade)
+  checklistItem LavSafetyChecklistItem             @relation(fields: [checklistItemId], references: [id], onDelete: Restrict)
+  files         LavSafetyObservationResponseFile[]
+
+  @@unique([observationId, checklistItemId])
+  @@index([checklistItemId])
+  @@map("lav_safety_observation_responses")
+}
+
+model LavSafetyObservationResponseFile {
+  responseId String @db.Uuid
+  fileId     String @db.Uuid
+  sortOrder  Int    @default(0)
+
+  response LavSafetyObservationResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  file     File                         @relation(fields: [fileId], references: [id], onDelete: Restrict)
+
+  @@id([responseId, fileId])
+  @@index([fileId])
+  @@map("lav_safety_observation_response_files")
+}
+
+model LavSafetyObservationFile {
+  observationId String @db.Uuid
+  fileId        String @db.Uuid
+  sortOrder     Int    @default(0)
+
+  observation LavSafetyObservation @relation(fields: [observationId], references: [id], onDelete: Cascade)
+  file        File                 @relation(fields: [fileId], references: [id], onDelete: Restrict)
+
+  @@id([observationId, fileId])
+  @@index([fileId])
+  @@map("lav_safety_observation_files")
+}
+
+model SecuritySearchArea {
+  id        String  @id @default(uuid()) @db.Uuid
+  code      String  @unique
+  label     String
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  trainingResults CabinSecuritySearchTrainingResult[]
+
+  @@map("security_search_areas")
+}
+
+model CabinSecuritySearchTraining {
+  id                  String            @id @default(uuid()) @db.Uuid
+  stationId           String            @db.Uuid
+  shiftOccurrenceId   String?           @db.Uuid
+  gateId              String            @db.Uuid
+  auditorUserId       String            @db.Uuid
+  auditorNameSnapshot String
+  auditorRoleSnapshot String
+  gateCodeSnapshot    String
+  trainingAt          DateTime          @default(now())
+  shipNumber          String
+  otherFindings       String?
+  additionalNotes     String?
+  overallResult       PassFail
+  status              AuditRecordStatus @default(SUBMITTED)
+  submittedAt         DateTime          @default(now())
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  station         Station                             @relation(fields: [stationId], references: [id], onDelete: Restrict)
+  shiftOccurrence ShiftOccurrence?                    @relation(fields: [shiftOccurrenceId], references: [id], onDelete: SetNull)
+  gate            Gate                                @relation(fields: [gateId], references: [id], onDelete: Restrict)
+  auditorUser     User                                @relation(fields: [auditorUserId], references: [id], onDelete: Restrict)
+  results         CabinSecuritySearchTrainingResult[]
+  files           CabinSecuritySearchTrainingFile[]
+
+  @@index([stationId, trainingAt])
+  @@index([auditorUserId])
+  @@index([overallResult])
+  @@index([status])
+  @@map("cabin_security_search_trainings")
+}
+
+model CabinSecuritySearchTrainingResult {
+  id                String   @id @default(uuid()) @db.Uuid
+  trainingId        String   @db.Uuid
+  areaId            String   @db.Uuid
+  areaLabelSnapshot String
+  result            PassFail
+
+  training CabinSecuritySearchTraining             @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  area     SecuritySearchArea                      @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  files    CabinSecuritySearchTrainingResultFile[]
+
+  @@unique([trainingId, areaId])
+  @@index([areaId])
+  @@map("cabin_security_search_training_results")
+}
+
+model CabinSecuritySearchTrainingResultFile {
+  resultId  String @db.Uuid
+  fileId    String @db.Uuid
+  sortOrder Int    @default(0)
+
+  result CabinSecuritySearchTrainingResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  file   File                              @relation(fields: [fileId], references: [id], onDelete: Restrict)
+
+  @@id([resultId, fileId])
+  @@index([fileId])
+  @@map("cabin_security_search_training_result_files")
+}
+
+model CabinSecuritySearchTrainingFile {
+  trainingId String @db.Uuid
+  fileId     String @db.Uuid
+  sortOrder  Int    @default(0)
+
+  training CabinSecuritySearchTraining @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  file     File                        @relation(fields: [fileId], references: [id], onDelete: Restrict)
+
+  @@id([trainingId, fileId])
+  @@index([fileId])
+  @@map("cabin_security_search_training_files")
+}
+
+model EndOfShiftReport {
+  id                      String            @id @default(uuid()) @db.Uuid
+  stationId               String            @db.Uuid
+  shiftOccurrenceId       String?           @db.Uuid
+  supervisorUserId        String            @db.Uuid
+  supervisorNameSnapshot  String
+  supervisorRoleSnapshot  String
+  reportAt                DateTime          @default(now())
+  lavObservationCompleted Boolean
+  lavObservationReason    String?
+  cabinQualityCompleted   Boolean
+  cabinQualityReason      String?
+  callOffs                Int
+  tardyEarlyOut           Int
+  overtimeHours           Int
+  overtimeMinutes         Int
+  overtimeReason          String?
+  delaysTaken             Boolean
+  delayCount              Int?
+  additionalNotes         String?
+  status                  AuditRecordStatus @default(SUBMITTED)
+  submittedAt             DateTime          @default(now())
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+
+  station         Station                 @relation(fields: [stationId], references: [id], onDelete: Restrict)
+  shiftOccurrence ShiftOccurrence?        @relation(fields: [shiftOccurrenceId], references: [id], onDelete: SetNull)
+  supervisorUser  User                    @relation(fields: [supervisorUserId], references: [id], onDelete: Restrict)
+  delays          EndOfShiftReportDelay[]
+  files           EndOfShiftReportFile[]
+
+  @@index([stationId, reportAt])
+  @@index([supervisorUserId])
+  @@index([delaysTaken])
+  @@index([status])
+  @@map("end_of_shift_reports")
+}
+
+model EndOfShiftReportDelay {
+  id              String    @id @default(uuid()) @db.Uuid
+  reportId        String    @db.Uuid
+  sequenceNo      Int
+  delayCodeAlpha  String
+  delayCodeNumber Int
+  delayType       DelayType
+  reason          String
+
+  report EndOfShiftReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@unique([reportId, sequenceNo])
+  @@index([delayCodeAlpha, delayCodeNumber])
+  @@index([delayType])
+  @@map("end_of_shift_report_delays")
+}
+
+model EndOfShiftReportFile {
+  reportId  String @db.Uuid
+  fileId    String @db.Uuid
+  sortOrder Int    @default(0)
+
+  report EndOfShiftReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  file   File             @relation(fields: [fileId], references: [id], onDelete: Restrict)
+
+  @@id([reportId, fileId])
+  @@index([fileId])
+  @@map("end_of_shift_report_files")
+}
+
+model EmployeeOneOnOne {
+  id                      String            @id @default(uuid()) @db.Uuid
+  stationId               String            @db.Uuid
+  leaderUserId            String            @db.Uuid
+  employeeUserId          String            @db.Uuid
+  leaderNameSnapshot      String
+  leaderRoleSnapshot      String
+  employeeNameSnapshot    String
+  meetingAt               DateTime          @default(now())
+  discussionText          String?
+  discussionAudioFileId   String?           @db.Uuid
+  additionalNote          String?
+  employeeRefusedToSign   Boolean           @default(false)
+  employeeSignatureFileId String?           @db.Uuid
+  leaderSignatureFileId   String            @db.Uuid
+  status                  AuditRecordStatus @default(SUBMITTED)
+  submittedAt             DateTime          @default(now())
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+
+  station               Station @relation(fields: [stationId], references: [id], onDelete: Restrict)
+  leaderUser            User    @relation("LeaderOneOnOnes", fields: [leaderUserId], references: [id], onDelete: Restrict)
+  employeeUser          User    @relation("EmployeeOneOnOnes", fields: [employeeUserId], references: [id], onDelete: Restrict)
+  discussionAudioFile   File?   @relation("EmployeeOneOnOneAudio", fields: [discussionAudioFileId], references: [id], onDelete: SetNull)
+  employeeSignatureFile File?   @relation("EmployeeOneOnOneEmployeeSignature", fields: [employeeSignatureFileId], references: [id], onDelete: SetNull)
+  leaderSignatureFile   File    @relation("EmployeeOneOnOneLeaderSignature", fields: [leaderSignatureFileId], references: [id], onDelete: Restrict)
+
+  @@index([stationId, meetingAt])
+  @@index([leaderUserId])
+  @@index([employeeUserId])
+  @@index([status])
+  @@map("employee_one_on_ones")
+}
+
+model AppFeedback {
+  id                  String      @id @default(uuid()) @db.Uuid
+  stationId           String      @db.Uuid
+  submittedByUserId   String      @db.Uuid
+  userNameSnapshot    String
+  userRoleSnapshot    String
+  submittedAt         DateTime    @default(now())
+  overallSatisfaction RatingScale
+  easeOfUse           RatingScale
+  appPerformance      RatingScale
+  usabilityIssues     String?
+  missingFeatures     String?
+  performanceIssues   String?
+
+  station         Station @relation(fields: [stationId], references: [id], onDelete: Restrict)
+  submittedByUser User    @relation(fields: [submittedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([stationId, submittedAt])
+  @@index([submittedByUserId])
+  @@map("app_feedback")
+}
+
+model ChatConversation {
+  id               String           @id @default(uuid()) @db.Uuid
+  conversationType ConversationType
+  stationId        String?          @db.Uuid
+  createdByUserId  String           @db.Uuid
+  title            String?
+  directPairKey    String?          @unique
+  avatarFileId     String?          @db.Uuid
+  lastMessageId    String?          @unique @db.Uuid
+  lastMessageAt    DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  station       Station?                      @relation(fields: [stationId], references: [id], onDelete: SetNull)
+  createdByUser User                          @relation("ChatConversationCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  avatarFile    File?                         @relation("ChatConversationAvatar", fields: [avatarFileId], references: [id], onDelete: SetNull)
+  lastMessage   ChatMessage?                  @relation("ChatConversationLastMessage", fields: [lastMessageId], references: [id], onDelete: SetNull)
+  participants  ChatConversationParticipant[]
+  messages      ChatMessage[]                 @relation("ChatConversationMessages")
+
+  @@index([conversationType, lastMessageAt])
+  @@index([createdByUserId])
+  @@map("chat_conversations")
+}
+
+model ChatConversationParticipant {
+  id                String                 @id @default(uuid()) @db.Uuid
+  conversationId    String                 @db.Uuid
+  userId            String                 @db.Uuid
+  memberRole        ConversationMemberRole @default(MEMBER)
+  isFavorite        Boolean                @default(false)
+  isMuted           Boolean                @default(false)
+  lastReadMessageId String?                @db.Uuid
+  lastReadAt        DateTime?
+  joinedAt          DateTime               @default(now())
+  leftAt            DateTime?
+
+  conversation    ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastReadMessage ChatMessage?     @relation("ParticipantLastReadMessage", fields: [lastReadMessageId], references: [id], onDelete: SetNull)
+
+  @@unique([conversationId, userId])
+  @@index([userId, isFavorite])
+  @@index([conversationId])
+  @@map("chat_conversation_participants")
+}
+
+model ChatMessage {
+  id               String      @id @default(uuid()) @db.Uuid
+  conversationId   String      @db.Uuid
+  senderUserId     String      @db.Uuid
+  messageType      MessageType
+  encryptedPayload String?
+  createdAt        DateTime    @default(now())
+  editedAt         DateTime?
+  deletedAt        DateTime?
+
+  conversation           ChatConversation              @relation("ChatConversationMessages", fields: [conversationId], references: [id], onDelete: Cascade)
+  senderUser             User                          @relation("ChatMessageSender", fields: [senderUserId], references: [id], onDelete: Restrict)
+  receipts               ChatMessageReceipt[]
+  files                  ChatMessageFile[]
+  poll                   ChatPoll?
+  event                  ChatEvent?
+  location               ChatLocation?
+  contact                ChatContact?
+  lastForConversation    ChatConversation?             @relation("ChatConversationLastMessage")
+  lastReadByParticipants ChatConversationParticipant[] @relation("ParticipantLastReadMessage")
+
+  @@index([conversationId, createdAt])
+  @@index([senderUserId, createdAt])
+  @@map("chat_messages")
+}
+
+model ChatMessageReceipt {
+  messageId       String    @db.Uuid
+  recipientUserId String    @db.Uuid
+  deliveredAt     DateTime?
+  readAt          DateTime?
+
+  message       ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  recipientUser User        @relation("ChatMessageRecipient", fields: [recipientUserId], references: [id], onDelete: Cascade)
+
+  @@id([messageId, recipientUserId])
+  @@index([recipientUserId, readAt])
+  @@map("chat_message_receipts")
+}
+
+model ChatMessageFile {
+  id             String         @id @default(uuid()) @db.Uuid
+  messageId      String         @db.Uuid
+  fileId         String         @db.Uuid
+  attachmentKind AttachmentKind
+  sortOrder      Int            @default(0)
+
+  message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  file    File        @relation(fields: [fileId], references: [id], onDelete: Restrict)
+
+  @@unique([messageId, fileId])
+  @@index([messageId, sortOrder])
+  @@map("chat_message_files")
+}
+
+model ChatPoll {
+  messageId            String  @id @db.Uuid
+  question             String
+  allowMultipleAnswers Boolean @default(false)
+
+  message ChatMessage      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  options ChatPollOption[]
+
+  @@map("chat_polls")
+}
+
+model ChatPollOption {
+  id            String @id @default(uuid()) @db.Uuid
+  pollMessageId String @db.Uuid
+  optionText    String
+  sortOrder     Int    @default(0)
+
+  poll  ChatPoll       @relation(fields: [pollMessageId], references: [messageId], onDelete: Cascade)
+  votes ChatPollVote[]
+
+  @@unique([pollMessageId, sortOrder])
+  @@map("chat_poll_options")
+}
+
+model ChatPollVote {
+  id          String   @id @default(uuid()) @db.Uuid
+  optionId    String   @db.Uuid
+  voterUserId String   @db.Uuid
+  votedAt     DateTime @default(now())
+
+  option    ChatPollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  voterUser User           @relation(fields: [voterUserId], references: [id], onDelete: Cascade)
+
+  @@unique([optionId, voterUserId])
+  @@index([voterUserId])
+  @@map("chat_poll_votes")
+}
+
+model ChatEvent {
+  messageId             String    @id @db.Uuid
+  eventName             String
+  description           String?
+  startAt               DateTime
+  endAt                 DateTime?
+  locationText          String?
+  callType              CallType?
+  callLinkUrl           String?
+  reminderOffsetMinutes Int?
+  allowGuests           Boolean   @default(false)
+
+  message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@map("chat_events")
+}
+
+model ChatLocation {
+  messageId     String       @id @db.Uuid
+  locationType  LocationType
+  latitude      Decimal      @db.Decimal(10, 7)
+  longitude     Decimal      @db.Decimal(10, 7)
+  addressText   String?
+  liveExpiresAt DateTime?
+  lastUpdatedAt DateTime?
+
+  message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@map("chat_locations")
+}
+
+model ChatContact {
+  messageId    String  @id @db.Uuid
+  contactName  String
+  contactPhone String
+  contactEmail String?
+
+  message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@map("chat_contacts")
 }
