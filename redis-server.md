@@ -1,87 +1,114 @@
-You can run Redis with Docker in a few simple steps. This is the easiest way to get Redis ≥ 6.2 for your NestJS project.
+# Running Redis with Docker for NestJS
 
-1️⃣ Pull the Redis image
+The easiest way to get Redis ≥ 6.2 running locally for your NestJS project.
 
-First download the latest Redis image.
+---
 
+## 1️⃣ Pull the Redis Image
+
+```bash
 docker pull redis:7
-2️⃣ Run Redis container
+```
+
+---
+
+## 2️⃣ Run Redis Container
+
+```bash
 docker run -d \
- --name redis-server \
- -p 6379:6379 \
- redis:7
+  --name redis-server \
+  -p 6379:6379 \
+  redis:7
+```
 
-Explanation:
+| Flag                  | Description                  |
+| --------------------- | ---------------------------- |
+| `-d`                  | Run in background (detached) |
+| `--name redis-server` | Assign a container name      |
+| `-p 6379:6379`        | Expose Redis port to host    |
+| `redis:7`             | Use Redis version 7 image    |
 
--d → run in background
+---
 
---name redis-server → container name
+## 3️⃣ Verify Redis is Running
 
--p 6379:6379 → expose Redis port
-
-redis:7 → Redis version 7 image
-
-3️⃣ Verify Redis is running
+```bash
 docker ps
+```
 
-You should see a container named redis-server.
+You should see a container named `redis-server` in the list.
 
-4️⃣ Test Redis
+---
+
+## 4️⃣ Test Redis
 
 Run Redis CLI inside the container:
 
+```bash
 docker exec -it redis-server redis-cli
+```
 
 Then type:
 
+```
 ping
+```
 
-Expected result:
+Expected output:
 
+```
 PONG
-5️⃣ Connect NestJS to Redis
+```
 
-Your Bull or Redis config should be:
+---
 
+## 5️⃣ Connect NestJS to Redis
+
+Use `localhost:6379` in your Bull or Redis config:
+
+```ts
 redis: {
-host: "localhost",
-port: 6379,
+  host: "localhost",
+  port: 6379,
 }
+```
 
-Since Docker exposes port 6379, your app can connect normally.
+Since Docker exposes port `6379`, your app connects normally.
 
-6️⃣ Stop / Start Redis container
+---
 
-Stop:
+## 6️⃣ Stop / Start the Redis Container
 
+```bash
+# Stop
 docker stop redis-server
 
-Start again:
-
+# Start again
 docker start redis-server
-7️⃣ (Recommended) Use Docker Compose
+```
 
-Create docker-compose.yml:
+---
 
-version: "3"
+## 7️⃣ (Recommended) Use Docker Compose
+
+Create a `docker-compose.yml`:
+
+```yaml
+version: '3'
 services:
-redis:
-image: redis:7
-container_name: redis-server
-ports: - "6379:6379"
+  redis:
+    image: redis:7
+    container_name: redis-server
+    ports:
+      - '6379:6379'
+```
 
-Run:
+Then run:
 
+```bash
 docker compose up -d
+```
 
-✅ Now your NestJS + Redis + Bull queue setup will work without the Redis 5.0.7 warning.
+---
 
-💡 If you want, I can also show you:
-
-🔥 Best Docker setup for NestJS + Redis + PostgreSQL + Prisma
-
-⚡ How to add Redis UI (RedisInsight)
-
-🧠 How Bull queues work with Redis in NestJS
-
-These make debugging 10× easier.
+✅ Your NestJS + Redis + Bull queue setup will now work without the Redis 5.0.7 version warning.
