@@ -1,0 +1,32 @@
+# Build Log
+
+## 2026-03-12
+- Initialized implementation plan and milestone structure.
+- Created required documentation scaffold before code changes.
+- Installed platform dependencies (JWT, Swagger, BullMQ, Redis, storage, mail, logging).
+- Implemented modular backend scaffolding and modules:
+  - auth, stations, master-data, files, notifications, health, users
+  - cabin-quality-audits, lav-safety-observations
+  - cabin-security-search-trainings, end-of-shift-reports
+  - employee-one-on-ones, feedback, chat (REST + WebSocket)
+- Added Prisma schema hardening (timestamptz annotations, metadata fields, chat preview field).
+- Added migration `20260312090000_hardening_indexes` with:
+  - timestamptz conversion SQL
+  - partial unique index for submitted cabin quality per station+shift
+  - pg_trgm indexes
+  - lowercase unique indexes for uid/email
+- Implemented seed script in `prisma/seed.ts`.
+- Added Docker Compose for Postgres/Redis/MailHog/MinIO.
+- Validation runs:
+  - `yarn.cmd prisma:validate` ✅
+  - `yarn.cmd prisma:generate` ✅
+  - `yarn.cmd build` ✅
+  - `yarn.cmd lint` ✅
+  - `yarn.cmd test --runInBand` ✅
+  - `yarn.cmd test:e2e --runInBand` ✅
+- Database migration/seed validation against local PostgreSQL (`newdb`) with explicit env override:
+  - `npx prisma migrate deploy` ✅
+  - `npx prisma migrate status` ✅ (up to date)
+  - `npx prisma db seed` ✅
+- Docker daemon startup was not permitted in this environment, so compose-based infra validation could not be executed end-to-end here.
+- HTTP smoke startup check via detached process was blocked by execution policy in this environment.
