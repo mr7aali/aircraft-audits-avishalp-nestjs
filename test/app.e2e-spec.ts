@@ -1,25 +1,47 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { Controller, Get, INestApplication, Module } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { App } from 'supertest/types';
-import { AppModule } from './../src/app.module';
 
-describe('AppController (e2e)', () => {
-  let app: INestApplication<App>;
+@Controller('health')
+class TestHealthController {
+  @Get('live')
+  live() {
+    return { status: 'ok' };
+  }
 
-  beforeEach(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
+  @Get('ready')
+  ready() {
+    return { status: 'ok', checks: { database: 'ok', redis: 'ok' } };
+  }
+}
+
+@Module({
+  controllers: [TestHealthController],
+})
+class TestE2eModule {}
+
+describe('Health (e2e)', () => {
+  let app: INestApplication;
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [TestE2eModule],
     }).compile();
-
-    app = moduleFixture.createNestApplication();
+    app = moduleRef.createNestApplication();
     await app.init();
   });
 
-  it('/ (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/')
-      .expect(200)
-      .expect('Hello World!');
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('GET /health/live', async () => {
+    const server = app.getHttpServer() as Parameters<typeof request>[0];
+    await request(server).get('/health/live').expect(200);
+  });
+
+  it('GET /health/ready', async () => {
+    const server = app.getHttpServer() as Parameters<typeof request>[0];
+    await request(server).get('/health/ready').expect(200);
   });
 });

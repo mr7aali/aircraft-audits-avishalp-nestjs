@@ -7,6 +7,7 @@ export default defineConfig({
   schema: 'prisma/schema.prisma',
   migrations: {
     path: 'prisma/migrations',
+    seed: 'tsx prisma/seed.ts',
   },
   datasource: {
     // url: 'postgresql://postgres:1234@localhost:5432/newdb?schema=public',

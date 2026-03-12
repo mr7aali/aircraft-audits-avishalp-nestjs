@@ -1,7 +1,6 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 export const successResponse = (
   data: any,
-  message = "Success",
+  message = 'Success',
   statusCode = 200,
 ) => ({
   success: true,
