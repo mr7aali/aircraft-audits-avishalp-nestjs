@@ -1,0 +1,1593 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/api/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LoginDto" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Auth"]
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "operationId": "AuthController_refresh",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RefreshTokenDto" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Auth"]
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LogoutDto" }
+            }
+          }
+        },
+        "responses": { "200": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Auth"]
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "operationId": "AuthController_me",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Auth"]
+      }
+    },
+    "/api/auth/forgot-password/request": {
+      "post": {
+        "operationId": "AuthController_forgotPasswordRequest",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordRequestDto"
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Auth"]
+      }
+    },
+    "/api/auth/forgot-password/confirm": {
+      "post": {
+        "operationId": "AuthController_forgotPasswordConfirm",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordConfirmDto"
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Auth"]
+      }
+    },
+    "/api/auth/forgot-uid/request": {
+      "post": {
+        "operationId": "AuthController_forgotUidRequest",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ForgotUidRequestDto" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Auth"]
+      }
+    },
+    "/api/auth/no-email-access-message": {
+      "get": {
+        "operationId": "AuthController_getNoEmailAccessMessage",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Auth"]
+      }
+    },
+    "/api/stations/my": {
+      "get": {
+        "operationId": "StationsController_getMyStations",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Stations"]
+      }
+    },
+    "/api/stations/select": {
+      "post": {
+        "operationId": "StationsController_selectStation",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SelectStationDto" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Stations"]
+      }
+    },
+    "/api/stations/active": {
+      "get": {
+        "operationId": "StationsController_getActiveStation",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Stations"]
+      }
+    },
+    "/api/master-data/clean-types": {
+      "get": {
+        "operationId": "MasterDataController_getCleanTypes",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Master Data"]
+      }
+    },
+    "/api/master-data/cabin-quality-checklist-items": {
+      "get": {
+        "operationId": "MasterDataController_getCabinQualityChecklistItems",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Master Data"]
+      }
+    },
+    "/api/master-data/lav-safety-checklist-items": {
+      "get": {
+        "operationId": "MasterDataController_getLavSafetyChecklistItems",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Master Data"]
+      }
+    },
+    "/api/master-data/security-search-areas": {
+      "get": {
+        "operationId": "MasterDataController_getSecuritySearchAreas",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Master Data"]
+      }
+    },
+    "/api/master-data/gates": {
+      "get": {
+        "operationId": "MasterDataController_getGates",
+        "parameters": [
+          {
+            "name": "stationId",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Master Data"]
+      }
+    },
+    "/api/files/upload": {
+      "post": {
+        "operationId": "FilesController_upload",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": { "$ref": "#/components/schemas/UploadFileDto" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Files"]
+      }
+    },
+    "/api/files/{id}": {
+      "get": {
+        "operationId": "FilesController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Files"]
+      }
+    },
+    "/api/files/{id}/download-url": {
+      "get": {
+        "operationId": "FilesController_getDownloadUrl",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Files"]
+      }
+    },
+    "/api/files/{id}/content": {
+      "get": {
+        "operationId": "FilesController_getContent",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Files"]
+      }
+    },
+    "/api/health/live": {
+      "get": {
+        "operationId": "HealthController_live",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Health"]
+      }
+    },
+    "/api/health/ready": {
+      "get": {
+        "operationId": "HealthController_ready",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Health"]
+      }
+    },
+    "/api/employees/search": {
+      "get": {
+        "operationId": "UsersController_search",
+        "parameters": [
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Users"]
+      }
+    },
+    "/api/cabin-quality-audits": {
+      "get": {
+        "operationId": "CabinQualityAuditsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": { "$ref": "#/components/schemas/Object" }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": { "$ref": "#/components/schemas/Object" }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "desc",
+              "type": "string",
+              "enum": ["asc", "desc"]
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "auditorName",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "gateId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "cleanTypeId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Cabin Quality Audits"]
+      },
+      "post": {
+        "operationId": "CabinQualityAuditsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCabinQualityAuditDto"
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Cabin Quality Audits"]
+      }
+    },
+    "/api/cabin-quality-audits/{id}": {
+      "get": {
+        "operationId": "CabinQualityAuditsController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Cabin Quality Audits"]
+      }
+    },
+    "/api/lav-safety-observations": {
+      "get": {
+        "operationId": "LavSafetyObservationsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": { "$ref": "#/components/schemas/Object" }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": { "$ref": "#/components/schemas/Object" }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "desc",
+              "type": "string",
+              "enum": ["asc", "desc"]
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "auditorName",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "driverName",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "gateId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["LAV Safety Observations"]
+      },
+      "post": {
+        "operationId": "LavSafetyObservationsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLavSafetyObservationDto"
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["LAV Safety Observations"]
+      }
+    },
+    "/api/lav-safety-observations/{id}": {
+      "get": {
+        "operationId": "LavSafetyObservationsController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["LAV Safety Observations"]
+      }
+    },
+    "/api/cabin-security-search-trainings": {
+      "get": {
+        "operationId": "CabinSecuritySearchTrainingsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": { "$ref": "#/components/schemas/Object" }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": { "$ref": "#/components/schemas/Object" }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "desc",
+              "type": "string",
+              "enum": ["asc", "desc"]
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "auditorName",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "result",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["PASS", "FAIL"] }
+          },
+          {
+            "name": "gateId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Cabin Security Search Trainings"]
+      },
+      "post": {
+        "operationId": "CabinSecuritySearchTrainingsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCabinSecuritySearchTrainingDto"
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Cabin Security Search Trainings"]
+      }
+    },
+    "/api/cabin-security-search-trainings/{id}": {
+      "get": {
+        "operationId": "CabinSecuritySearchTrainingsController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Cabin Security Search Trainings"]
+      }
+    },
+    "/api/end-of-shift-reports": {
+      "get": {
+        "operationId": "EndOfShiftReportsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": { "$ref": "#/components/schemas/Object" }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": { "$ref": "#/components/schemas/Object" }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "desc",
+              "type": "string",
+              "enum": ["asc", "desc"]
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "supervisorName",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "delayCodeAlpha",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "delayCodeNumber",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "number" }
+          },
+          {
+            "name": "overtimeHours",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "number" }
+          },
+          {
+            "name": "overtimeMinutes",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "number" }
+          },
+          {
+            "name": "delayType",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["PRIMARY", "SECONDARY"] }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["End Of Shift Reports"]
+      },
+      "post": {
+        "operationId": "EndOfShiftReportsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEndOfShiftReportDto"
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["End Of Shift Reports"]
+      }
+    },
+    "/api/end-of-shift-reports/{id}": {
+      "get": {
+        "operationId": "EndOfShiftReportsController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["End Of Shift Reports"]
+      }
+    },
+    "/api/employee-one-on-ones": {
+      "get": {
+        "operationId": "EmployeeOneOnOnesController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": { "$ref": "#/components/schemas/Object" }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": { "$ref": "#/components/schemas/Object" }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "desc",
+              "type": "string",
+              "enum": ["asc", "desc"]
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "employeeName",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "leaderName",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Employee 1:1"]
+      },
+      "post": {
+        "operationId": "EmployeeOneOnOnesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEmployeeOneOnOneDto"
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Employee 1:1"]
+      }
+    },
+    "/api/employee-one-on-ones/{id}": {
+      "get": {
+        "operationId": "EmployeeOneOnOnesController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Employee 1:1"]
+      }
+    },
+    "/api/feedback": {
+      "post": {
+        "operationId": "FeedbackController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateFeedbackDto" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Feedback"]
+      },
+      "get": {
+        "operationId": "FeedbackController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": { "$ref": "#/components/schemas/Object" }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": { "$ref": "#/components/schemas/Object" }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "desc",
+              "type": "string",
+              "enum": ["asc", "desc"]
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "userName",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Feedback"]
+      }
+    },
+    "/api/feedback/my": {
+      "get": {
+        "operationId": "FeedbackController_my",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": { "$ref": "#/components/schemas/Object" }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": { "$ref": "#/components/schemas/Object" }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "desc",
+              "type": "string",
+              "enum": ["asc", "desc"]
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "userName",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Feedback"]
+      }
+    },
+    "/api/chat/conversations": {
+      "get": {
+        "operationId": "ChatController_listConversations",
+        "parameters": [
+          {
+            "name": "tab",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "all",
+              "type": "string",
+              "enum": ["all", "unread", "groups", "favorite"]
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Chat"]
+      }
+    },
+    "/api/chat/conversations/direct": {
+      "post": {
+        "operationId": "ChatController_createDirect",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDirectConversationDto"
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Chat"]
+      }
+    },
+    "/api/chat/conversations/group": {
+      "post": {
+        "operationId": "ChatController_createGroup",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGroupConversationDto"
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Chat"]
+      }
+    },
+    "/api/chat/conversations/{id}": {
+      "get": {
+        "operationId": "ChatController_getConversation",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Chat"]
+      }
+    },
+    "/api/chat/conversations/{id}/messages": {
+      "get": {
+        "operationId": "ChatController_getMessages",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Chat"]
+      },
+      "post": {
+        "operationId": "ChatController_sendMessage",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SendMessageDto" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Chat"]
+      }
+    },
+    "/api/chat/conversations/{id}/favorite": {
+      "patch": {
+        "operationId": "ChatController_setFavorite",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SetFavoriteDto" }
+            }
+          }
+        },
+        "responses": { "200": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Chat"]
+      }
+    },
+    "/api/chat/conversations/{id}/mute": {
+      "patch": {
+        "operationId": "ChatController_setMute",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SetMuteDto" }
+            }
+          }
+        },
+        "responses": { "200": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Chat"]
+      }
+    },
+    "/api/chat/messages/{id}/read": {
+      "post": {
+        "operationId": "ChatController_markRead",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/MessageReceiptDto" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Chat"]
+      }
+    },
+    "/api/chat/messages/{id}/delivered": {
+      "post": {
+        "operationId": "ChatController_markDelivered",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/MessageReceiptDto" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Chat"]
+      }
+    },
+    "/api/chat/polls/{messageId}/votes": {
+      "post": {
+        "operationId": "ChatController_votePoll",
+        "parameters": [
+          {
+            "name": "messageId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PollVoteDto" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "security": [{ "bearer": [] }],
+        "tags": ["Chat"]
+      }
+    }
+  },
+  "info": {
+    "title": "Station Audit Platform API",
+    "description": "Operational station audit and communication backend",
+    "version": "1.0.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": { "scheme": "bearer", "bearerFormat": "JWT", "type": "http" }
+    },
+    "schemas": {
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "userId": { "type": "string", "minLength": 1, "maxLength": 50 },
+          "password": { "type": "string", "minLength": 8, "maxLength": 20 },
+          "rememberMe": { "type": "object", "default": false },
+          "deviceId": { "type": "string" },
+          "deviceName": { "type": "string" }
+        },
+        "required": ["userId", "password"]
+      },
+      "RefreshTokenDto": {
+        "type": "object",
+        "properties": { "refreshToken": { "type": "string" } },
+        "required": ["refreshToken"]
+      },
+      "LogoutDto": {
+        "type": "object",
+        "properties": { "refreshToken": { "type": "string" } }
+      },
+      "ForgotPasswordRequestDto": {
+        "type": "object",
+        "properties": { "email": { "type": "string" } },
+        "required": ["email"]
+      },
+      "ForgotPasswordConfirmDto": {
+        "type": "object",
+        "properties": {
+          "token": { "type": "string" },
+          "newPassword": { "type": "string", "minLength": 8, "maxLength": 20 }
+        },
+        "required": ["token", "newPassword"]
+      },
+      "ForgotUidRequestDto": {
+        "type": "object",
+        "properties": { "email": { "type": "string" } },
+        "required": ["email"]
+      },
+      "SelectStationDto": {
+        "type": "object",
+        "properties": { "stationId": { "type": "string" } },
+        "required": ["stationId"]
+      },
+      "UploadFileDto": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": ["IMAGE", "VIDEO", "AUDIO", "DOCUMENT", "SIGNATURE"]
+          }
+        }
+      },
+      "Object": { "type": "object", "properties": {} },
+      "CabinQualityAuditResponseInputDto": {
+        "type": "object",
+        "properties": {
+          "checklistItemId": { "type": "string" },
+          "response": { "type": "string", "enum": ["YES", "NO", "NA"] },
+          "imageFileIds": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["checklistItemId", "response"]
+      },
+      "CreateCabinQualityAuditDto": {
+        "type": "object",
+        "properties": {
+          "gateId": { "type": "string" },
+          "cleanTypeId": { "type": "string" },
+          "shiftOccurrenceId": { "type": "string" },
+          "responses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CabinQualityAuditResponseInputDto"
+            }
+          },
+          "signatureFileId": { "type": "string" },
+          "otherFindings": { "type": "string" },
+          "additionalNotes": { "type": "string" },
+          "generalPictureFileIds": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "required": ["gateId", "cleanTypeId", "responses", "signatureFileId"]
+      },
+      "LavSafetyResponseInputDto": {
+        "type": "object",
+        "properties": {
+          "checklistItemId": { "type": "string" },
+          "response": { "type": "string", "enum": ["PASS", "FAIL"] },
+          "imageFileIds": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["checklistItemId", "response"]
+      },
+      "CreateLavSafetyObservationDto": {
+        "type": "object",
+        "properties": {
+          "driverName": { "type": "string" },
+          "shipNumber": { "type": "string" },
+          "gateId": { "type": "string" },
+          "shiftOccurrenceId": { "type": "string" },
+          "responses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LavSafetyResponseInputDto"
+            }
+          },
+          "signatureFileId": { "type": "string" },
+          "otherFindings": { "type": "string" },
+          "additionalNotes": { "type": "string" },
+          "generalPictureFileIds": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "required": [
+          "driverName",
+          "shipNumber",
+          "gateId",
+          "responses",
+          "signatureFileId"
+        ]
+      },
+      "SecurityTrainingAreaResultInputDto": {
+        "type": "object",
+        "properties": {
+          "areaId": { "type": "string" },
+          "result": { "type": "string", "enum": ["PASS", "FAIL"] },
+          "imageFileIds": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["areaId", "result"]
+      },
+      "CreateCabinSecuritySearchTrainingDto": {
+        "type": "object",
+        "properties": {
+          "shipNumber": { "type": "string" },
+          "gateId": { "type": "string" },
+          "shiftOccurrenceId": { "type": "string" },
+          "areaResults": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityTrainingAreaResultInputDto"
+            }
+          },
+          "otherFindings": { "type": "string" },
+          "additionalNotes": { "type": "string" },
+          "generalPictureFileIds": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "required": ["shipNumber", "gateId", "areaResults"]
+      },
+      "EndOfShiftDelayInputDto": {
+        "type": "object",
+        "properties": {
+          "sequenceNo": { "type": "number" },
+          "delayCodeAlpha": { "type": "string" },
+          "delayCodeNumber": { "type": "number" },
+          "delayType": { "type": "string", "enum": ["PRIMARY", "SECONDARY"] },
+          "reason": { "type": "string" }
+        },
+        "required": [
+          "sequenceNo",
+          "delayCodeAlpha",
+          "delayCodeNumber",
+          "delayType",
+          "reason"
+        ]
+      },
+      "CreateEndOfShiftReportDto": {
+        "type": "object",
+        "properties": {
+          "shiftOccurrenceId": { "type": "string" },
+          "lavObservationCompleted": { "type": "boolean" },
+          "lavObservationReason": { "type": "string" },
+          "cabinQualityCompleted": { "type": "boolean" },
+          "cabinQualityReason": { "type": "string" },
+          "callOffs": { "type": "number" },
+          "tardyEarlyOut": { "type": "number" },
+          "overtimeHours": { "type": "number" },
+          "overtimeMinutes": { "type": "number" },
+          "overtimeReason": { "type": "string" },
+          "delaysTaken": { "type": "boolean" },
+          "delayCount": { "type": "number" },
+          "delays": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/EndOfShiftDelayInputDto" }
+          },
+          "additionalNotes": { "type": "string" },
+          "additionalPictureFileIds": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "required": [
+          "lavObservationCompleted",
+          "cabinQualityCompleted",
+          "callOffs",
+          "tardyEarlyOut",
+          "overtimeHours",
+          "overtimeMinutes",
+          "delaysTaken"
+        ]
+      },
+      "CreateEmployeeOneOnOneDto": {
+        "type": "object",
+        "properties": {
+          "employeeUserId": { "type": "string" },
+          "discussionText": { "type": "string" },
+          "discussionAudioFileId": { "type": "string" },
+          "additionalNote": { "type": "string" },
+          "employeeRefusedToSign": { "type": "boolean" },
+          "employeeSignatureFileId": { "type": "string" },
+          "leaderSignatureFileId": { "type": "string" }
+        },
+        "required": [
+          "employeeUserId",
+          "employeeRefusedToSign",
+          "leaderSignatureFileId"
+        ]
+      },
+      "CreateFeedbackDto": {
+        "type": "object",
+        "properties": {
+          "overallSatisfaction": {
+            "type": "string",
+            "enum": ["VERY_POOR", "POOR", "FAIR", "GOOD", "VERY_GOOD"]
+          },
+          "easeOfUse": {
+            "type": "string",
+            "enum": ["VERY_POOR", "POOR", "FAIR", "GOOD", "VERY_GOOD"]
+          },
+          "appPerformance": {
+            "type": "string",
+            "enum": ["VERY_POOR", "POOR", "FAIR", "GOOD", "VERY_GOOD"]
+          },
+          "usabilityIssues": { "type": "string" },
+          "missingFeatures": { "type": "string" },
+          "performanceIssues": { "type": "string" }
+        },
+        "required": ["overallSatisfaction", "easeOfUse", "appPerformance"]
+      },
+      "CreateDirectConversationDto": {
+        "type": "object",
+        "properties": { "userId": { "type": "string" } },
+        "required": ["userId"]
+      },
+      "CreateGroupConversationDto": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "participantUserIds": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "avatarFileId": { "type": "string" }
+        },
+        "required": ["title", "participantUserIds"]
+      },
+      "SetFavoriteDto": {
+        "type": "object",
+        "properties": { "isFavorite": { "type": "boolean" } },
+        "required": ["isFavorite"]
+      },
+      "SetMuteDto": {
+        "type": "object",
+        "properties": { "isMuted": { "type": "boolean" } },
+        "required": ["isMuted"]
+      },
+      "MessageAttachmentDto": {
+        "type": "object",
+        "properties": {
+          "fileId": { "type": "string" },
+          "kind": {
+            "type": "string",
+            "enum": ["IMAGE", "AUDIO", "DOCUMENT", "VIDEO"]
+          }
+        },
+        "required": ["fileId", "kind"]
+      },
+      "PollOptionInputDto": {
+        "type": "object",
+        "properties": { "text": { "type": "string" } },
+        "required": ["text"]
+      },
+      "PollInputDto": {
+        "type": "object",
+        "properties": {
+          "question": { "type": "string" },
+          "allowMultipleAnswers": { "type": "boolean" },
+          "options": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/PollOptionInputDto" }
+          }
+        },
+        "required": ["question", "allowMultipleAnswers", "options"]
+      },
+      "EventInputDto": {
+        "type": "object",
+        "properties": {
+          "eventName": { "type": "string" },
+          "description": { "type": "string" },
+          "startAt": { "type": "string" },
+          "endAt": { "type": "string" },
+          "locationText": { "type": "string" },
+          "callType": { "type": "string", "enum": ["VIDEO", "VOICE"] },
+          "callLinkUrl": { "type": "string" },
+          "reminderOffsetMinutes": { "type": "number" },
+          "allowGuests": { "type": "boolean", "default": false }
+        },
+        "required": ["eventName", "startAt"]
+      },
+      "LocationInputDto": {
+        "type": "object",
+        "properties": {
+          "locationType": {
+            "type": "string",
+            "enum": ["CURRENT", "LIVE", "SEARCHED"]
+          },
+          "latitude": { "type": "number" },
+          "longitude": { "type": "number" },
+          "addressText": { "type": "string" },
+          "liveExpiresAt": { "type": "string" }
+        },
+        "required": ["locationType", "latitude", "longitude"]
+      },
+      "ContactInputDto": {
+        "type": "object",
+        "properties": {
+          "contactName": { "type": "string" },
+          "contactPhone": { "type": "string" },
+          "contactEmail": { "type": "string" }
+        },
+        "required": ["contactName", "contactPhone"]
+      },
+      "SendMessageDto": {
+        "type": "object",
+        "properties": {
+          "messageType": {
+            "type": "string",
+            "enum": [
+              "TEXT",
+              "IMAGE",
+              "AUDIO",
+              "DOCUMENT",
+              "VIDEO",
+              "LOCATION",
+              "CONTACT",
+              "POLL",
+              "EVENT",
+              "SYSTEM"
+            ]
+          },
+          "encryptedPayload": { "type": "string" },
+          "previewText": { "type": "string" },
+          "attachments": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/MessageAttachmentDto" }
+          },
+          "poll": { "$ref": "#/components/schemas/PollInputDto" },
+          "event": { "$ref": "#/components/schemas/EventInputDto" },
+          "location": { "$ref": "#/components/schemas/LocationInputDto" },
+          "contact": { "$ref": "#/components/schemas/ContactInputDto" }
+        },
+        "required": ["messageType"]
+      },
+      "MessageReceiptDto": {
+        "type": "object",
+        "properties": { "conversationId": { "type": "string" } }
+      },
+      "PollVoteDto": {
+        "type": "object",
+        "properties": {
+          "optionIds": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["optionIds"]
+      }
+    }
+  }
+}

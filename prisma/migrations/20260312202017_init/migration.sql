@@ -1,10 +1,3 @@
-/*
-  Warnings:
-
-  - You are about to drop the `Post` table. If the table is not empty, all the data it contains will be lost.
-  - You are about to drop the `User` table. If the table is not empty, all the data it contains will be lost.
-
-*/
 -- CreateEnum
 CREATE TYPE "UserStatus" AS ENUM ('ACTIVE', 'INACTIVE', 'LOCKED');
 
@@ -56,23 +49,14 @@ CREATE TYPE "LocationType" AS ENUM ('CURRENT', 'LIVE', 'SEARCHED');
 -- CreateEnum
 CREATE TYPE "CallType" AS ENUM ('VIDEO', 'VOICE');
 
--- DropForeignKey
-ALTER TABLE "Post" DROP CONSTRAINT "Post_authorId_fkey";
-
--- DropTable
-DROP TABLE "Post";
-
--- DropTable
-DROP TABLE "User";
-
 -- CreateTable
 CREATE TABLE "roles" (
     "id" UUID NOT NULL,
     "code" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "roles_pkey" PRIMARY KEY ("id")
 );
@@ -87,13 +71,13 @@ CREATE TABLE "users" (
     "lastName" TEXT NOT NULL,
     "phone" TEXT,
     "profileImageFileId" UUID,
-    "publishedAt" TIMESTAMP(3),
+    "publishedAt" TIMESTAMPTZ(3),
     "status" "UserStatus" NOT NULL DEFAULT 'ACTIVE',
     "failedLoginCount" INTEGER NOT NULL DEFAULT 0,
-    "lockedUntil" TIMESTAMP(3),
-    "lastSeenAt" TIMESTAMP(3),
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "lockedUntil" TIMESTAMPTZ(3),
+    "lastSeenAt" TIMESTAMPTZ(3),
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
 );
@@ -106,8 +90,8 @@ CREATE TABLE "stations" (
     "name" TEXT NOT NULL,
     "timezone" TEXT NOT NULL,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "stations_pkey" PRIMARY KEY ("id")
 );
@@ -119,8 +103,8 @@ CREATE TABLE "gates" (
     "gateCode" TEXT NOT NULL,
     "name" TEXT,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "gates_pkey" PRIMARY KEY ("id")
 );
@@ -133,8 +117,8 @@ CREATE TABLE "user_station_access" (
     "roleId" UUID NOT NULL,
     "isDefault" BOOLEAN NOT NULL DEFAULT false,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "user_station_access_pkey" PRIMARY KEY ("id")
 );
@@ -179,8 +163,8 @@ CREATE TABLE "shift_occurrences" (
     "stationId" UUID NOT NULL,
     "shiftDefinitionId" UUID NOT NULL,
     "businessDate" DATE NOT NULL,
-    "startsAt" TIMESTAMP(3) NOT NULL,
-    "endsAt" TIMESTAMP(3) NOT NULL,
+    "startsAt" TIMESTAMPTZ(3) NOT NULL,
+    "endsAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "shift_occurrences_pkey" PRIMARY KEY ("id")
 );
@@ -204,11 +188,13 @@ CREATE TABLE "files" (
     "mimeType" TEXT NOT NULL,
     "sizeBytes" BIGINT NOT NULL,
     "checksumSha256" TEXT,
+    "metadataJson" JSONB,
+    "durationSeconds" INTEGER,
     "fileCategory" "FileCategory" NOT NULL,
     "scanStatus" "ScanStatus" NOT NULL DEFAULT 'PENDING',
     "encryptedAtRest" BOOLEAN NOT NULL DEFAULT false,
     "uploadedByUserId" UUID,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "files_pkey" PRIMARY KEY ("id")
 );
@@ -224,10 +210,10 @@ CREATE TABLE "auth_sessions" (
     "deviceName" TEXT,
     "ipAddress" TEXT,
     "userAgent" TEXT,
-    "expiresAt" TIMESTAMP(3) NOT NULL,
-    "lastUsedAt" TIMESTAMP(3),
-    "revokedAt" TIMESTAMP(3),
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expiresAt" TIMESTAMPTZ(3) NOT NULL,
+    "lastUsedAt" TIMESTAMPTZ(3),
+    "revokedAt" TIMESTAMPTZ(3),
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "auth_sessions_pkey" PRIMARY KEY ("id")
 );
@@ -239,11 +225,11 @@ CREATE TABLE "account_recovery_requests" (
     "requestedEmail" TEXT NOT NULL,
     "recoveryType" "RecoveryType" NOT NULL,
     "tokenHash" TEXT,
-    "expiresAt" TIMESTAMP(3),
-    "consumedAt" TIMESTAMP(3),
+    "expiresAt" TIMESTAMPTZ(3),
+    "consumedAt" TIMESTAMPTZ(3),
     "status" "RecoveryStatus" NOT NULL DEFAULT 'REQUESTED',
     "requestedIp" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "account_recovery_requests_pkey" PRIMARY KEY ("id")
 );
@@ -259,9 +245,9 @@ CREATE TABLE "email_notifications" (
     "payloadJson" JSONB,
     "providerMessageId" TEXT,
     "status" "NotificationStatus" NOT NULL DEFAULT 'PENDING',
-    "sentAt" TIMESTAMP(3),
-    "failedAt" TIMESTAMP(3),
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "sentAt" TIMESTAMPTZ(3),
+    "failedAt" TIMESTAMPTZ(3),
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "email_notifications_pkey" PRIMARY KEY ("id")
 );
@@ -275,7 +261,7 @@ CREATE TABLE "login_audit_logs" (
     "failureReason" TEXT,
     "ipAddress" TEXT,
     "userAgent" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "login_audit_logs_pkey" PRIMARY KEY ("id")
 );
@@ -303,14 +289,14 @@ CREATE TABLE "cabin_quality_audits" (
     "auditorRoleSnapshot" TEXT NOT NULL,
     "gateCodeSnapshot" TEXT NOT NULL,
     "cleanTypeSnapshot" TEXT NOT NULL,
-    "auditAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "auditAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "otherFindings" TEXT,
     "additionalNotes" TEXT,
     "signatureFileId" UUID NOT NULL,
     "status" "AuditRecordStatus" NOT NULL DEFAULT 'SUBMITTED',
-    "submittedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "submittedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "cabin_quality_audits_pkey" PRIMARY KEY ("id")
 );
@@ -364,16 +350,16 @@ CREATE TABLE "lav_safety_observations" (
     "auditorNameSnapshot" TEXT NOT NULL,
     "auditorRoleSnapshot" TEXT NOT NULL,
     "gateCodeSnapshot" TEXT NOT NULL,
-    "observedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "observedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "driverName" TEXT NOT NULL,
     "shipNumber" TEXT NOT NULL,
     "otherFindings" TEXT,
     "additionalNotes" TEXT,
     "signatureFileId" UUID NOT NULL,
     "status" "AuditRecordStatus" NOT NULL DEFAULT 'SUBMITTED',
-    "submittedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "submittedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "lav_safety_observations_pkey" PRIMARY KEY ("id")
 );
@@ -427,15 +413,15 @@ CREATE TABLE "cabin_security_search_trainings" (
     "auditorNameSnapshot" TEXT NOT NULL,
     "auditorRoleSnapshot" TEXT NOT NULL,
     "gateCodeSnapshot" TEXT NOT NULL,
-    "trainingAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "trainingAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "shipNumber" TEXT NOT NULL,
     "otherFindings" TEXT,
     "additionalNotes" TEXT,
     "overallResult" "PassFail" NOT NULL,
     "status" "AuditRecordStatus" NOT NULL DEFAULT 'SUBMITTED',
-    "submittedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "submittedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "cabin_security_search_trainings_pkey" PRIMARY KEY ("id")
 );
@@ -477,7 +463,7 @@ CREATE TABLE "end_of_shift_reports" (
     "supervisorUserId" UUID NOT NULL,
     "supervisorNameSnapshot" TEXT NOT NULL,
     "supervisorRoleSnapshot" TEXT NOT NULL,
-    "reportAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "reportAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "lavObservationCompleted" BOOLEAN NOT NULL,
     "lavObservationReason" TEXT,
     "cabinQualityCompleted" BOOLEAN NOT NULL,
@@ -491,9 +477,9 @@ CREATE TABLE "end_of_shift_reports" (
     "delayCount" INTEGER,
     "additionalNotes" TEXT,
     "status" "AuditRecordStatus" NOT NULL DEFAULT 'SUBMITTED',
-    "submittedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "submittedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "end_of_shift_reports_pkey" PRIMARY KEY ("id")
 );
@@ -529,7 +515,7 @@ CREATE TABLE "employee_one_on_ones" (
     "leaderNameSnapshot" TEXT NOT NULL,
     "leaderRoleSnapshot" TEXT NOT NULL,
     "employeeNameSnapshot" TEXT NOT NULL,
-    "meetingAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "meetingAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "discussionText" TEXT,
     "discussionAudioFileId" UUID,
     "additionalNote" TEXT,
@@ -537,9 +523,9 @@ CREATE TABLE "employee_one_on_ones" (
     "employeeSignatureFileId" UUID,
     "leaderSignatureFileId" UUID NOT NULL,
     "status" "AuditRecordStatus" NOT NULL DEFAULT 'SUBMITTED',
-    "submittedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "submittedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "employee_one_on_ones_pkey" PRIMARY KEY ("id")
 );
@@ -551,7 +537,7 @@ CREATE TABLE "app_feedback" (
     "submittedByUserId" UUID NOT NULL,
     "userNameSnapshot" TEXT NOT NULL,
     "userRoleSnapshot" TEXT NOT NULL,
-    "submittedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "submittedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "overallSatisfaction" "RatingScale" NOT NULL,
     "easeOfUse" "RatingScale" NOT NULL,
     "appPerformance" "RatingScale" NOT NULL,
@@ -572,9 +558,9 @@ CREATE TABLE "chat_conversations" (
     "directPairKey" TEXT,
     "avatarFileId" UUID,
     "lastMessageId" UUID,
-    "lastMessageAt" TIMESTAMP(3),
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "lastMessageAt" TIMESTAMPTZ(3),
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "chat_conversations_pkey" PRIMARY KEY ("id")
 );
@@ -588,9 +574,9 @@ CREATE TABLE "chat_conversation_participants" (
     "isFavorite" BOOLEAN NOT NULL DEFAULT false,
     "isMuted" BOOLEAN NOT NULL DEFAULT false,
     "lastReadMessageId" UUID,
-    "lastReadAt" TIMESTAMP(3),
-    "joinedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "leftAt" TIMESTAMP(3),
+    "lastReadAt" TIMESTAMPTZ(3),
+    "joinedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "leftAt" TIMESTAMPTZ(3),
 
     CONSTRAINT "chat_conversation_participants_pkey" PRIMARY KEY ("id")
 );
@@ -602,9 +588,10 @@ CREATE TABLE "chat_messages" (
     "senderUserId" UUID NOT NULL,
     "messageType" "MessageType" NOT NULL,
     "encryptedPayload" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "editedAt" TIMESTAMP(3),
-    "deletedAt" TIMESTAMP(3),
+    "previewText" TEXT,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "editedAt" TIMESTAMPTZ(3),
+    "deletedAt" TIMESTAMPTZ(3),
 
     CONSTRAINT "chat_messages_pkey" PRIMARY KEY ("id")
 );
@@ -613,8 +600,8 @@ CREATE TABLE "chat_messages" (
 CREATE TABLE "chat_message_receipts" (
     "messageId" UUID NOT NULL,
     "recipientUserId" UUID NOT NULL,
-    "deliveredAt" TIMESTAMP(3),
-    "readAt" TIMESTAMP(3),
+    "deliveredAt" TIMESTAMPTZ(3),
+    "readAt" TIMESTAMPTZ(3),
 
     CONSTRAINT "chat_message_receipts_pkey" PRIMARY KEY ("messageId","recipientUserId")
 );
@@ -654,7 +641,7 @@ CREATE TABLE "chat_poll_votes" (
     "id" UUID NOT NULL,
     "optionId" UUID NOT NULL,
     "voterUserId" UUID NOT NULL,
-    "votedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "votedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "chat_poll_votes_pkey" PRIMARY KEY ("id")
 );
@@ -664,8 +651,8 @@ CREATE TABLE "chat_events" (
     "messageId" UUID NOT NULL,
     "eventName" TEXT NOT NULL,
     "description" TEXT,
-    "startAt" TIMESTAMP(3) NOT NULL,
-    "endAt" TIMESTAMP(3),
+    "startAt" TIMESTAMPTZ(3) NOT NULL,
+    "endAt" TIMESTAMPTZ(3),
     "locationText" TEXT,
     "callType" "CallType",
     "callLinkUrl" TEXT,
@@ -682,8 +669,8 @@ CREATE TABLE "chat_locations" (
     "latitude" DECIMAL(10,7) NOT NULL,
     "longitude" DECIMAL(10,7) NOT NULL,
     "addressText" TEXT,
-    "liveExpiresAt" TIMESTAMP(3),
-    "lastUpdatedAt" TIMESTAMP(3),
+    "liveExpiresAt" TIMESTAMPTZ(3),
+    "lastUpdatedAt" TIMESTAMPTZ(3),
 
     CONSTRAINT "chat_locations_pkey" PRIMARY KEY ("messageId")
 );
@@ -954,37 +941,37 @@ ALTER TABLE "users" ADD CONSTRAINT "users_profileImageFileId_fkey" FOREIGN KEY (
 ALTER TABLE "gates" ADD CONSTRAINT "gates_stationId_fkey" FOREIGN KEY ("stationId") REFERENCES "stations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "user_station_access" ADD CONSTRAINT "user_station_access_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "user_station_access" ADD CONSTRAINT "user_station_access_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "roles"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "user_station_access" ADD CONSTRAINT "user_station_access_stationId_fkey" FOREIGN KEY ("stationId") REFERENCES "stations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "user_station_access" ADD CONSTRAINT "user_station_access_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "roles"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "role_module_access" ADD CONSTRAINT "role_module_access_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "roles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "user_station_access" ADD CONSTRAINT "user_station_access_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "role_module_access" ADD CONSTRAINT "role_module_access_moduleId_fkey" FOREIGN KEY ("moduleId") REFERENCES "app_modules"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "shift_definitions" ADD CONSTRAINT "shift_definitions_stationId_fkey" FOREIGN KEY ("stationId") REFERENCES "stations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "role_module_access" ADD CONSTRAINT "role_module_access_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "roles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "shift_occurrences" ADD CONSTRAINT "shift_occurrences_stationId_fkey" FOREIGN KEY ("stationId") REFERENCES "stations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "shift_definitions" ADD CONSTRAINT "shift_definitions_stationId_fkey" FOREIGN KEY ("stationId") REFERENCES "stations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "shift_occurrences" ADD CONSTRAINT "shift_occurrences_shiftDefinitionId_fkey" FOREIGN KEY ("shiftDefinitionId") REFERENCES "shift_definitions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "shift_occurrences" ADD CONSTRAINT "shift_occurrences_stationId_fkey" FOREIGN KEY ("stationId") REFERENCES "stations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "files" ADD CONSTRAINT "files_uploadedByUserId_fkey" FOREIGN KEY ("uploadedByUserId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "auth_sessions" ADD CONSTRAINT "auth_sessions_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "auth_sessions" ADD CONSTRAINT "auth_sessions_activeStationId_fkey" FOREIGN KEY ("activeStationId") REFERENCES "stations"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "auth_sessions" ADD CONSTRAINT "auth_sessions_activeStationId_fkey" FOREIGN KEY ("activeStationId") REFERENCES "stations"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "auth_sessions" ADD CONSTRAINT "auth_sessions_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "account_recovery_requests" ADD CONSTRAINT "account_recovery_requests_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -999,22 +986,22 @@ ALTER TABLE "email_notifications" ADD CONSTRAINT "email_notifications_userId_fke
 ALTER TABLE "login_audit_logs" ADD CONSTRAINT "login_audit_logs_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "cabin_quality_audits" ADD CONSTRAINT "cabin_quality_audits_stationId_fkey" FOREIGN KEY ("stationId") REFERENCES "stations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "cabin_quality_audits" ADD CONSTRAINT "cabin_quality_audits_shiftOccurrenceId_fkey" FOREIGN KEY ("shiftOccurrenceId") REFERENCES "shift_occurrences"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "cabin_quality_audits" ADD CONSTRAINT "cabin_quality_audits_gateId_fkey" FOREIGN KEY ("gateId") REFERENCES "gates"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "cabin_quality_audits" ADD CONSTRAINT "cabin_quality_audits_auditorUserId_fkey" FOREIGN KEY ("auditorUserId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "cabin_quality_audits" ADD CONSTRAINT "cabin_quality_audits_cleanTypeId_fkey" FOREIGN KEY ("cleanTypeId") REFERENCES "clean_types"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "cabin_quality_audits" ADD CONSTRAINT "cabin_quality_audits_auditorUserId_fkey" FOREIGN KEY ("auditorUserId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "cabin_quality_audits" ADD CONSTRAINT "cabin_quality_audits_gateId_fkey" FOREIGN KEY ("gateId") REFERENCES "gates"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "cabin_quality_audits" ADD CONSTRAINT "cabin_quality_audits_shiftOccurrenceId_fkey" FOREIGN KEY ("shiftOccurrenceId") REFERENCES "shift_occurrences"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "cabin_quality_audits" ADD CONSTRAINT "cabin_quality_audits_signatureFileId_fkey" FOREIGN KEY ("signatureFileId") REFERENCES "files"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "cabin_quality_audits" ADD CONSTRAINT "cabin_quality_audits_stationId_fkey" FOREIGN KEY ("stationId") REFERENCES "stations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "cabin_quality_audit_responses" ADD CONSTRAINT "cabin_quality_audit_responses_auditId_fkey" FOREIGN KEY ("auditId") REFERENCES "cabin_quality_audits"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -1023,10 +1010,10 @@ ALTER TABLE "cabin_quality_audit_responses" ADD CONSTRAINT "cabin_quality_audit_
 ALTER TABLE "cabin_quality_audit_responses" ADD CONSTRAINT "cabin_quality_audit_responses_checklistItemId_fkey" FOREIGN KEY ("checklistItemId") REFERENCES "cabin_quality_checklist_items"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "cabin_quality_audit_response_files" ADD CONSTRAINT "cabin_quality_audit_response_files_responseId_fkey" FOREIGN KEY ("responseId") REFERENCES "cabin_quality_audit_responses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "cabin_quality_audit_response_files" ADD CONSTRAINT "cabin_quality_audit_response_files_fileId_fkey" FOREIGN KEY ("fileId") REFERENCES "files"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "cabin_quality_audit_response_files" ADD CONSTRAINT "cabin_quality_audit_response_files_fileId_fkey" FOREIGN KEY ("fileId") REFERENCES "files"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "cabin_quality_audit_response_files" ADD CONSTRAINT "cabin_quality_audit_response_files_responseId_fkey" FOREIGN KEY ("responseId") REFERENCES "cabin_quality_audit_responses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "cabin_quality_audit_files" ADD CONSTRAINT "cabin_quality_audit_files_auditId_fkey" FOREIGN KEY ("auditId") REFERENCES "cabin_quality_audits"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -1035,73 +1022,73 @@ ALTER TABLE "cabin_quality_audit_files" ADD CONSTRAINT "cabin_quality_audit_file
 ALTER TABLE "cabin_quality_audit_files" ADD CONSTRAINT "cabin_quality_audit_files_fileId_fkey" FOREIGN KEY ("fileId") REFERENCES "files"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "lav_safety_observations" ADD CONSTRAINT "lav_safety_observations_stationId_fkey" FOREIGN KEY ("stationId") REFERENCES "stations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "lav_safety_observations" ADD CONSTRAINT "lav_safety_observations_shiftOccurrenceId_fkey" FOREIGN KEY ("shiftOccurrenceId") REFERENCES "shift_occurrences"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "lav_safety_observations" ADD CONSTRAINT "lav_safety_observations_auditorUserId_fkey" FOREIGN KEY ("auditorUserId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "lav_safety_observations" ADD CONSTRAINT "lav_safety_observations_gateId_fkey" FOREIGN KEY ("gateId") REFERENCES "gates"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "lav_safety_observations" ADD CONSTRAINT "lav_safety_observations_auditorUserId_fkey" FOREIGN KEY ("auditorUserId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "lav_safety_observations" ADD CONSTRAINT "lav_safety_observations_shiftOccurrenceId_fkey" FOREIGN KEY ("shiftOccurrenceId") REFERENCES "shift_occurrences"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "lav_safety_observations" ADD CONSTRAINT "lav_safety_observations_signatureFileId_fkey" FOREIGN KEY ("signatureFileId") REFERENCES "files"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "lav_safety_observation_responses" ADD CONSTRAINT "lav_safety_observation_responses_observationId_fkey" FOREIGN KEY ("observationId") REFERENCES "lav_safety_observations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "lav_safety_observations" ADD CONSTRAINT "lav_safety_observations_stationId_fkey" FOREIGN KEY ("stationId") REFERENCES "stations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "lav_safety_observation_responses" ADD CONSTRAINT "lav_safety_observation_responses_checklistItemId_fkey" FOREIGN KEY ("checklistItemId") REFERENCES "lav_safety_checklist_items"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "lav_safety_observation_response_files" ADD CONSTRAINT "lav_safety_observation_response_files_responseId_fkey" FOREIGN KEY ("responseId") REFERENCES "lav_safety_observation_responses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "lav_safety_observation_responses" ADD CONSTRAINT "lav_safety_observation_responses_observationId_fkey" FOREIGN KEY ("observationId") REFERENCES "lav_safety_observations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "lav_safety_observation_response_files" ADD CONSTRAINT "lav_safety_observation_response_files_fileId_fkey" FOREIGN KEY ("fileId") REFERENCES "files"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "lav_safety_observation_files" ADD CONSTRAINT "lav_safety_observation_files_observationId_fkey" FOREIGN KEY ("observationId") REFERENCES "lav_safety_observations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "lav_safety_observation_response_files" ADD CONSTRAINT "lav_safety_observation_response_files_responseId_fkey" FOREIGN KEY ("responseId") REFERENCES "lav_safety_observation_responses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "lav_safety_observation_files" ADD CONSTRAINT "lav_safety_observation_files_fileId_fkey" FOREIGN KEY ("fileId") REFERENCES "files"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "cabin_security_search_trainings" ADD CONSTRAINT "cabin_security_search_trainings_stationId_fkey" FOREIGN KEY ("stationId") REFERENCES "stations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "cabin_security_search_trainings" ADD CONSTRAINT "cabin_security_search_trainings_shiftOccurrenceId_fkey" FOREIGN KEY ("shiftOccurrenceId") REFERENCES "shift_occurrences"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "cabin_security_search_trainings" ADD CONSTRAINT "cabin_security_search_trainings_gateId_fkey" FOREIGN KEY ("gateId") REFERENCES "gates"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "lav_safety_observation_files" ADD CONSTRAINT "lav_safety_observation_files_observationId_fkey" FOREIGN KEY ("observationId") REFERENCES "lav_safety_observations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "cabin_security_search_trainings" ADD CONSTRAINT "cabin_security_search_trainings_auditorUserId_fkey" FOREIGN KEY ("auditorUserId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "cabin_security_search_training_results" ADD CONSTRAINT "cabin_security_search_training_results_trainingId_fkey" FOREIGN KEY ("trainingId") REFERENCES "cabin_security_search_trainings"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "cabin_security_search_trainings" ADD CONSTRAINT "cabin_security_search_trainings_gateId_fkey" FOREIGN KEY ("gateId") REFERENCES "gates"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "cabin_security_search_trainings" ADD CONSTRAINT "cabin_security_search_trainings_shiftOccurrenceId_fkey" FOREIGN KEY ("shiftOccurrenceId") REFERENCES "shift_occurrences"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "cabin_security_search_trainings" ADD CONSTRAINT "cabin_security_search_trainings_stationId_fkey" FOREIGN KEY ("stationId") REFERENCES "stations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "cabin_security_search_training_results" ADD CONSTRAINT "cabin_security_search_training_results_areaId_fkey" FOREIGN KEY ("areaId") REFERENCES "security_search_areas"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "cabin_security_search_training_result_files" ADD CONSTRAINT "cabin_security_search_training_result_files_resultId_fkey" FOREIGN KEY ("resultId") REFERENCES "cabin_security_search_training_results"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "cabin_security_search_training_results" ADD CONSTRAINT "cabin_security_search_training_results_trainingId_fkey" FOREIGN KEY ("trainingId") REFERENCES "cabin_security_search_trainings"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "cabin_security_search_training_result_files" ADD CONSTRAINT "cabin_security_search_training_result_files_fileId_fkey" FOREIGN KEY ("fileId") REFERENCES "files"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "cabin_security_search_training_files" ADD CONSTRAINT "cabin_security_search_training_files_trainingId_fkey" FOREIGN KEY ("trainingId") REFERENCES "cabin_security_search_trainings"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "cabin_security_search_training_result_files" ADD CONSTRAINT "cabin_security_search_training_result_files_resultId_fkey" FOREIGN KEY ("resultId") REFERENCES "cabin_security_search_training_results"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "cabin_security_search_training_files" ADD CONSTRAINT "cabin_security_search_training_files_fileId_fkey" FOREIGN KEY ("fileId") REFERENCES "files"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "end_of_shift_reports" ADD CONSTRAINT "end_of_shift_reports_stationId_fkey" FOREIGN KEY ("stationId") REFERENCES "stations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "cabin_security_search_training_files" ADD CONSTRAINT "cabin_security_search_training_files_trainingId_fkey" FOREIGN KEY ("trainingId") REFERENCES "cabin_security_search_trainings"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "end_of_shift_reports" ADD CONSTRAINT "end_of_shift_reports_shiftOccurrenceId_fkey" FOREIGN KEY ("shiftOccurrenceId") REFERENCES "shift_occurrences"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "end_of_shift_reports" ADD CONSTRAINT "end_of_shift_reports_stationId_fkey" FOREIGN KEY ("stationId") REFERENCES "stations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "end_of_shift_reports" ADD CONSTRAINT "end_of_shift_reports_supervisorUserId_fkey" FOREIGN KEY ("supervisorUserId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -1110,19 +1097,10 @@ ALTER TABLE "end_of_shift_reports" ADD CONSTRAINT "end_of_shift_reports_supervis
 ALTER TABLE "end_of_shift_report_delays" ADD CONSTRAINT "end_of_shift_report_delays_reportId_fkey" FOREIGN KEY ("reportId") REFERENCES "end_of_shift_reports"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "end_of_shift_report_files" ADD CONSTRAINT "end_of_shift_report_files_reportId_fkey" FOREIGN KEY ("reportId") REFERENCES "end_of_shift_reports"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "end_of_shift_report_files" ADD CONSTRAINT "end_of_shift_report_files_fileId_fkey" FOREIGN KEY ("fileId") REFERENCES "files"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "employee_one_on_ones" ADD CONSTRAINT "employee_one_on_ones_stationId_fkey" FOREIGN KEY ("stationId") REFERENCES "stations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "employee_one_on_ones" ADD CONSTRAINT "employee_one_on_ones_leaderUserId_fkey" FOREIGN KEY ("leaderUserId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "employee_one_on_ones" ADD CONSTRAINT "employee_one_on_ones_employeeUserId_fkey" FOREIGN KEY ("employeeUserId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "end_of_shift_report_files" ADD CONSTRAINT "end_of_shift_report_files_reportId_fkey" FOREIGN KEY ("reportId") REFERENCES "end_of_shift_reports"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "employee_one_on_ones" ADD CONSTRAINT "employee_one_on_ones_discussionAudioFileId_fkey" FOREIGN KEY ("discussionAudioFileId") REFERENCES "files"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -1131,7 +1109,16 @@ ALTER TABLE "employee_one_on_ones" ADD CONSTRAINT "employee_one_on_ones_discussi
 ALTER TABLE "employee_one_on_ones" ADD CONSTRAINT "employee_one_on_ones_employeeSignatureFileId_fkey" FOREIGN KEY ("employeeSignatureFileId") REFERENCES "files"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "employee_one_on_ones" ADD CONSTRAINT "employee_one_on_ones_employeeUserId_fkey" FOREIGN KEY ("employeeUserId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "employee_one_on_ones" ADD CONSTRAINT "employee_one_on_ones_leaderSignatureFileId_fkey" FOREIGN KEY ("leaderSignatureFileId") REFERENCES "files"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "employee_one_on_ones" ADD CONSTRAINT "employee_one_on_ones_leaderUserId_fkey" FOREIGN KEY ("leaderUserId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "employee_one_on_ones" ADD CONSTRAINT "employee_one_on_ones_stationId_fkey" FOREIGN KEY ("stationId") REFERENCES "stations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "app_feedback" ADD CONSTRAINT "app_feedback_stationId_fkey" FOREIGN KEY ("stationId") REFERENCES "stations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -1140,25 +1127,25 @@ ALTER TABLE "app_feedback" ADD CONSTRAINT "app_feedback_stationId_fkey" FOREIGN 
 ALTER TABLE "app_feedback" ADD CONSTRAINT "app_feedback_submittedByUserId_fkey" FOREIGN KEY ("submittedByUserId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "chat_conversations" ADD CONSTRAINT "chat_conversations_stationId_fkey" FOREIGN KEY ("stationId") REFERENCES "stations"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "chat_conversations" ADD CONSTRAINT "chat_conversations_avatarFileId_fkey" FOREIGN KEY ("avatarFileId") REFERENCES "files"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "chat_conversations" ADD CONSTRAINT "chat_conversations_createdByUserId_fkey" FOREIGN KEY ("createdByUserId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "chat_conversations" ADD CONSTRAINT "chat_conversations_avatarFileId_fkey" FOREIGN KEY ("avatarFileId") REFERENCES "files"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "chat_conversations" ADD CONSTRAINT "chat_conversations_lastMessageId_fkey" FOREIGN KEY ("lastMessageId") REFERENCES "chat_messages"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "chat_conversations" ADD CONSTRAINT "chat_conversations_lastMessageId_fkey" FOREIGN KEY ("lastMessageId") REFERENCES "chat_messages"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "chat_conversations" ADD CONSTRAINT "chat_conversations_stationId_fkey" FOREIGN KEY ("stationId") REFERENCES "stations"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "chat_conversation_participants" ADD CONSTRAINT "chat_conversation_participants_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "chat_conversations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "chat_conversation_participants" ADD CONSTRAINT "chat_conversation_participants_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "chat_conversation_participants" ADD CONSTRAINT "chat_conversation_participants_lastReadMessageId_fkey" FOREIGN KEY ("lastReadMessageId") REFERENCES "chat_messages"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "chat_conversation_participants" ADD CONSTRAINT "chat_conversation_participants_lastReadMessageId_fkey" FOREIGN KEY ("lastReadMessageId") REFERENCES "chat_messages"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "chat_conversation_participants" ADD CONSTRAINT "chat_conversation_participants_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "chat_messages" ADD CONSTRAINT "chat_messages_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "chat_conversations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -1173,10 +1160,10 @@ ALTER TABLE "chat_message_receipts" ADD CONSTRAINT "chat_message_receipts_messag
 ALTER TABLE "chat_message_receipts" ADD CONSTRAINT "chat_message_receipts_recipientUserId_fkey" FOREIGN KEY ("recipientUserId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "chat_message_files" ADD CONSTRAINT "chat_message_files_messageId_fkey" FOREIGN KEY ("messageId") REFERENCES "chat_messages"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "chat_message_files" ADD CONSTRAINT "chat_message_files_fileId_fkey" FOREIGN KEY ("fileId") REFERENCES "files"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "chat_message_files" ADD CONSTRAINT "chat_message_files_fileId_fkey" FOREIGN KEY ("fileId") REFERENCES "files"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "chat_message_files" ADD CONSTRAINT "chat_message_files_messageId_fkey" FOREIGN KEY ("messageId") REFERENCES "chat_messages"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "chat_polls" ADD CONSTRAINT "chat_polls_messageId_fkey" FOREIGN KEY ("messageId") REFERENCES "chat_messages"("id") ON DELETE CASCADE ON UPDATE CASCADE;

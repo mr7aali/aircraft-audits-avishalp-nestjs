@@ -30,6 +30,7 @@ Production-focused NestJS backend for station-scoped operations, employee workfl
 - [Build Log](docs/build-log.md)
 - [Decisions](docs/decisions.md)
 - [API Overview](docs/api-overview.md)
+- [Development Seeding Guide](docs/development-seeding.md)
 - [RBAC Matrix](docs/rbac-matrix.md)
 - [Data Model](docs/data-model.md)
 - [Chat Encryption Boundary](docs/chat-encryption-boundary.md)
@@ -65,6 +66,9 @@ yarn prisma:seed
 yarn start:dev
 ```
 
+Full local setup, seed data, default login users, and station-selection flow:
+- [Development Seeding Guide](docs/development-seeding.md)
+
 Swagger: `http://localhost:3000/api/docs`
 
 MailHog UI: `http://localhost:8025`
@@ -96,6 +100,9 @@ See `.env.example` for full list. Core values:
 ## Seeded Sample Users
 Password for all users: `Password@123`
 
+Full credential details, role/station mapping, and login flow:
+- [Development Seeding Guide](docs/development-seeding.md)
+
 - `vp.user` / `vp.user@example.com`
 - `sup.user` / `sup.user@example.com`
 - `employee.user` / `employee.user@example.com`
@@ -125,4 +132,3 @@ Password for all users: `Password@123`
 - `yarn prisma:validate` ✅
 - `npx prisma migrate deploy` ✅ (validated against reachable local PostgreSQL instance)
 - `npx prisma db seed` ✅ (validated against reachable local PostgreSQL instance)
-
