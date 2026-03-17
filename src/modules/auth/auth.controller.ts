@@ -15,8 +15,10 @@ import { LoginDto } from './dto/login.dto.js';
 import { RefreshTokenDto } from './dto/refresh-token.dto.js';
 import { LogoutDto } from './dto/logout.dto.js';
 import { ForgotPasswordRequestDto } from './dto/forgot-password-request.dto.js';
+import { ForgotPasswordVerifyDto } from './dto/forgot-password-verify.dto.js';
 import { ForgotPasswordConfirmDto } from './dto/forgot-password-confirm.dto.js';
 import { ForgotUidRequestDto } from './dto/forgot-uid-request.dto.js';
+import { ForgotUidVerifyDto } from './dto/forgot-uid-verify.dto.js';
 import { Public } from '../../common/decorators/public.decorator.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { AuthenticatedUser } from '../../common/types/authenticated-user.type.js';
@@ -63,10 +65,24 @@ export class AuthController {
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
   @Post('forgot-password/request')
-  async forgotPasswordRequest(@Body() dto: ForgotPasswordRequestDto) {
-    const recovery = await this.authService.forgotPasswordRequest(dto);
+  async forgotPasswordRequest(
+    @Body() dto: ForgotPasswordRequestDto,
+    @Req() request: Request,
+  ) {
+    await this.authService.forgotPasswordRequest(dto, request);
     return {
-      message: 'If the email is registered, recovery details were sent.',
+      message: 'A verification code has been sent to the registered email.',
+    };
+  }
+
+  @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  @Post('forgot-password/verify')
+  async forgotPasswordVerify(@Body() dto: ForgotPasswordVerifyDto) {
+    const recovery = await this.authService.forgotPasswordVerify(dto);
+    return {
+      message: 'Verification successful.',
       ...recovery,
     };
   }
@@ -84,10 +100,25 @@ export class AuthController {
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
   @Post('forgot-uid/request')
-  async forgotUidRequest(@Body() dto: ForgotUidRequestDto) {
-    await this.authService.forgotUidRequest(dto);
+  async forgotUidRequest(
+    @Body() dto: ForgotUidRequestDto,
+    @Req() request: Request,
+  ) {
+    await this.authService.forgotUidRequest(dto, request);
     return {
-      message: 'If the email is registered, the User ID has been sent.',
+      message: 'A verification code has been sent to the registered email.',
+    };
+  }
+
+  @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  @Post('forgot-uid/verify')
+  async forgotUidVerify(@Body() dto: ForgotUidVerifyDto) {
+    const recovery = await this.authService.forgotUidVerify(dto);
+    return {
+      message: 'User ID verified successfully.',
+      ...recovery,
     };
   }
 

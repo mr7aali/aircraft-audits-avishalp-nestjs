@@ -130,15 +130,19 @@ export class NotificationsService {
     templateCode: string,
     payload: Record<string, unknown>,
   ): string {
-    if (templateCode === 'PASSWORD_RESET') {
+    if (templateCode === 'PASSWORD_RESET_OTP') {
       return `<p>Dear ${payload.userName as string},</p>
-<p>We received a request to reset your password. Please click the link below to set a new password: <a href="${payload.resetLink as string}">${payload.resetLink as string}</a>.</p>
+<p>We received a request to reset your password. Use the verification code below to continue in the app:</p>
+<p><strong style="font-size: 24px; letter-spacing: 4px;">${payload.verificationCode as string}</strong></p>
+<p>This code expires in ${payload.expiresInMinutes as number} minutes.</p>
 <p>If you did not request this, please ignore this email.</p>
 <p>Thank you,<br/>Support Team</p>`;
     }
-    if (templateCode === 'UID_RECOVERY') {
+    if (templateCode === 'UID_RECOVERY_OTP') {
       return `<p>Dear ${payload.userName as string},</p>
-<p>As requested, your User ID for the platform is: ${payload.userId as string}. You can now use this ID to log into the application.</p>
+<p>We received a request to recover your User ID. Use the verification code below in the app:</p>
+<p><strong style="font-size: 24px; letter-spacing: 4px;">${payload.verificationCode as string}</strong></p>
+<p>This code expires in ${payload.expiresInMinutes as number} minutes.</p>
 <p>Thank you,<br/>Support Team</p>`;
     }
     return '<p>Notification</p>';
@@ -148,20 +152,24 @@ export class NotificationsService {
     templateCode: string,
     payload: Record<string, unknown>,
   ): string {
-    if (templateCode === 'PASSWORD_RESET') {
+    if (templateCode === 'PASSWORD_RESET_OTP') {
       return `Dear ${payload.userName as string},
 
-We received a request to reset your password. Please click the link below to set a new password: ${payload.resetLink as string}.
+We received a request to reset your password. Use this verification code in the app: ${payload.verificationCode as string}.
+
+This code expires in ${payload.expiresInMinutes as number} minutes.
 
 If you did not request this, please ignore this email.
 
 Thank you,
 Support Team`;
     }
-    if (templateCode === 'UID_RECOVERY') {
+    if (templateCode === 'UID_RECOVERY_OTP') {
       return `Dear ${payload.userName as string},
 
-As requested, your User ID for the platform is: ${payload.userId as string}. You can now use this ID to log into the application.
+We received a request to recover your User ID. Use this verification code in the app: ${payload.verificationCode as string}.
+
+This code expires in ${payload.expiresInMinutes as number} minutes.
 
 Thank you,
 Support Team`;

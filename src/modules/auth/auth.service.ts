@@ -15,8 +15,10 @@ import { LoginDto } from './dto/login.dto.js';
 import { RefreshTokenDto } from './dto/refresh-token.dto.js';
 import { LogoutDto } from './dto/logout.dto.js';
 import { ForgotPasswordRequestDto } from './dto/forgot-password-request.dto.js';
+import { ForgotPasswordVerifyDto } from './dto/forgot-password-verify.dto.js';
 import { ForgotPasswordConfirmDto } from './dto/forgot-password-confirm.dto.js';
 import { ForgotUidRequestDto } from './dto/forgot-uid-request.dto.js';
+import { ForgotUidVerifyDto } from './dto/forgot-uid-verify.dto.js';
 import { AuthenticatedUser } from '../../common/types/authenticated-user.type.js';
 import { JwtPayload } from './types/jwt-payload.type.js';
 
@@ -27,9 +29,19 @@ export interface TokenPair {
   refreshTokenExpiresAt: Date;
 }
 
+interface PasswordResetTokenPayload {
+  sub: string;
+  rid: string;
+  email: string;
+  type: 'PASSWORD_RESET';
+}
+
 @Injectable()
 export class AuthService {
   private readonly invalidCredentialMessage = 'Invalid User ID or Password';
+  private readonly recoveryCodeLength = 5;
+  private readonly recoveryCodeTtl = '10m';
+  private readonly passwordResetTokenTtl = '15m';
 
   constructor(
     private readonly prisma: PrismaService,
@@ -224,7 +236,8 @@ export class AuthService {
 
   async forgotPasswordRequest(
     dto: ForgotPasswordRequestDto,
-  ): Promise<{ recoveryToken: string }> {
+    request: Request,
+  ): Promise<void> {
     const emailInput = dto.email.trim().toLowerCase();
     const user = await this.prisma.user.findFirst({
       where: { email: { equals: emailInput, mode: 'insensitive' } },
@@ -237,41 +250,72 @@ export class AuthService {
       });
     }
 
-    const token = this.generateOpaqueToken();
-    const tokenHash = this.hashToken(token);
-    const expiresAt = this.computeExpiry('30m');
+    await this.expireOutstandingRecoveryRequests(emailInput, 'PASSWORD_RESET');
+
+    const verificationCode = this.generateVerificationCode();
+    const verificationCodeHash = this.hashToken(verificationCode);
+    const expiresAt = this.computeExpiry(this.recoveryCodeTtl);
 
     const requestRecord = await this.prisma.accountRecoveryRequest.create({
       data: {
         userId: user.id,
         requestedEmail: user.email,
         recoveryType: 'PASSWORD_RESET',
-        tokenHash,
+        verificationCodeHash,
         expiresAt,
         status: 'SENT',
+        requestedIp: this.readIp(request),
       },
     });
 
-    const resetLink = `${this.getConfigString('appBaseUrl')}/reset-password?token=${token}`;
     await this.notificationsService.queueAndSendEmail({
       requestId: requestRecord.id,
       userId: user.id,
       emailTo: user.email,
-      subject: 'Reset Your Password',
-      templateCode: 'PASSWORD_RESET',
+      subject: 'Password Reset Verification Code',
+      templateCode: 'PASSWORD_RESET_OTP',
       payloadJson: {
         userName: `${user.firstName} ${user.lastName}`,
-        resetLink,
+        verificationCode,
+        expiresInMinutes: this.durationToMinutes(this.recoveryCodeTtl),
       },
     });
+  }
 
-    return { recoveryToken: token };
+  async forgotPasswordVerify(
+    dto: ForgotPasswordVerifyDto,
+  ): Promise<{ resetToken: string }> {
+    const emailInput = dto.email.trim().toLowerCase();
+    const requestRecord = await this.findLatestRecoveryRequest(
+      emailInput,
+      'PASSWORD_RESET',
+    );
+
+    if (
+      !requestRecord ||
+      !requestRecord.user ||
+      !requestRecord.verificationCodeHash ||
+      requestRecord.status !== 'SENT' ||
+      !requestRecord.expiresAt ||
+      requestRecord.expiresAt <= new Date() ||
+      requestRecord.verificationCodeHash !== this.hashToken(dto.code.trim())
+    ) {
+      throw new BadRequestException('Invalid or expired verification code');
+    }
+
+    return {
+      resetToken: await this.issuePasswordResetToken({
+        requestId: requestRecord.id,
+        userId: requestRecord.user.id,
+        email: requestRecord.user.email,
+      }),
+    };
   }
 
   async forgotPasswordConfirm(dto: ForgotPasswordConfirmDto): Promise<void> {
-    const tokenHash = this.hashToken(dto.token);
+    const payload = await this.verifyPasswordResetToken(dto.token);
     const requestRecord = await this.prisma.accountRecoveryRequest.findUnique({
-      where: { tokenHash },
+      where: { id: payload.rid },
       include: { user: true },
     });
 
@@ -280,13 +324,14 @@ export class AuthService {
       requestRecord.recoveryType !== 'PASSWORD_RESET' ||
       requestRecord.status === 'COMPLETED' ||
       !requestRecord.user ||
-      !requestRecord.expiresAt ||
-      requestRecord.expiresAt <= new Date()
+      requestRecord.user.id !== payload.sub ||
+      requestRecord.user.email.toLowerCase() !== payload.email.toLowerCase()
     ) {
       throw new BadRequestException('Invalid or expired recovery token');
     }
 
     const passwordHash = await argon2.hash(dto.newPassword);
+    const revokedAt = new Date();
     await this.prisma.$transaction([
       this.prisma.user.update({
         where: { id: requestRecord.user.id },
@@ -296,17 +341,31 @@ export class AuthService {
           lockedUntil: null,
         },
       }),
+      this.prisma.authSession.updateMany({
+        where: {
+          userId: requestRecord.user.id,
+          revokedAt: null,
+        },
+        data: {
+          revokedAt,
+          activeStationId: null,
+        },
+      }),
       this.prisma.accountRecoveryRequest.update({
         where: { id: requestRecord.id },
         data: {
           status: 'COMPLETED',
           consumedAt: new Date(),
+          verificationCodeHash: null,
         },
       }),
     ]);
   }
 
-  async forgotUidRequest(dto: ForgotUidRequestDto): Promise<void> {
+  async forgotUidRequest(
+    dto: ForgotUidRequestDto,
+    request: Request,
+  ): Promise<void> {
     const emailInput = dto.email.trim().toLowerCase();
     const user = await this.prisma.user.findFirst({
       where: { email: { equals: emailInput, mode: 'insensitive' } },
@@ -319,12 +378,21 @@ export class AuthService {
       });
     }
 
+    await this.expireOutstandingRecoveryRequests(emailInput, 'UID_RECOVERY');
+
+    const verificationCode = this.generateVerificationCode();
+    const verificationCodeHash = this.hashToken(verificationCode);
+    const expiresAt = this.computeExpiry(this.recoveryCodeTtl);
+
     const requestRecord = await this.prisma.accountRecoveryRequest.create({
       data: {
         userId: user.id,
         requestedEmail: user.email,
         recoveryType: 'UID_RECOVERY',
+        verificationCodeHash,
+        expiresAt,
         status: 'SENT',
+        requestedIp: this.readIp(request),
       },
     });
 
@@ -332,13 +400,45 @@ export class AuthService {
       requestId: requestRecord.id,
       userId: user.id,
       emailTo: user.email,
-      subject: 'User ID Recovery',
-      templateCode: 'UID_RECOVERY',
+      subject: 'User ID Recovery Verification Code',
+      templateCode: 'UID_RECOVERY_OTP',
       payloadJson: {
         userName: `${user.firstName} ${user.lastName}`,
-        userId: user.uid,
+        verificationCode,
+        expiresInMinutes: this.durationToMinutes(this.recoveryCodeTtl),
       },
     });
+  }
+
+  async forgotUidVerify(dto: ForgotUidVerifyDto): Promise<{ userId: string }> {
+    const emailInput = dto.email.trim().toLowerCase();
+    const requestRecord = await this.findLatestRecoveryRequest(
+      emailInput,
+      'UID_RECOVERY',
+    );
+
+    if (
+      !requestRecord ||
+      !requestRecord.user ||
+      !requestRecord.verificationCodeHash ||
+      requestRecord.status !== 'SENT' ||
+      !requestRecord.expiresAt ||
+      requestRecord.expiresAt <= new Date() ||
+      requestRecord.verificationCodeHash !== this.hashToken(dto.code.trim())
+    ) {
+      throw new BadRequestException('Invalid or expired verification code');
+    }
+
+    await this.prisma.accountRecoveryRequest.update({
+      where: { id: requestRecord.id },
+      data: {
+        status: 'COMPLETED',
+        consumedAt: new Date(),
+        verificationCodeHash: null,
+      },
+    });
+
+    return { userId: requestRecord.user.uid };
   }
 
   noEmailAccessMessage(): string {
@@ -383,12 +483,101 @@ export class AuthService {
     return randomBytes(48).toString('hex');
   }
 
+  private generateVerificationCode(): string {
+    const max = 10 ** this.recoveryCodeLength;
+    return Math.floor(Math.random() * max)
+      .toString()
+      .padStart(this.recoveryCodeLength, '0');
+  }
+
+  private async expireOutstandingRecoveryRequests(
+    email: string,
+    recoveryType: 'PASSWORD_RESET' | 'UID_RECOVERY',
+  ): Promise<void> {
+    await this.prisma.accountRecoveryRequest.updateMany({
+      where: {
+        requestedEmail: email,
+        recoveryType,
+        consumedAt: null,
+        status: {
+          in: ['REQUESTED', 'SENT'],
+        },
+      },
+      data: {
+        status: 'EXPIRED',
+      },
+    });
+  }
+
+  private async findLatestRecoveryRequest(
+    email: string,
+    recoveryType: 'PASSWORD_RESET' | 'UID_RECOVERY',
+  ) {
+    return this.prisma.accountRecoveryRequest.findFirst({
+      where: {
+        requestedEmail: email,
+        recoveryType,
+        consumedAt: null,
+      },
+      include: { user: true },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+  }
+
+  private async issuePasswordResetToken(input: {
+    requestId: string;
+    userId: string;
+    email: string;
+  }): Promise<string> {
+    return this.jwtService.signAsync(
+      {
+        sub: input.userId,
+        rid: input.requestId,
+        email: input.email,
+        type: 'PASSWORD_RESET',
+      } satisfies PasswordResetTokenPayload,
+      {
+        secret: this.getConfigString('auth.accessSecret'),
+        expiresIn: this.passwordResetTokenTtl as ms.StringValue,
+      },
+    );
+  }
+
+  private async verifyPasswordResetToken(
+    token: string,
+  ): Promise<PasswordResetTokenPayload> {
+    try {
+      const payload =
+        await this.jwtService.verifyAsync<PasswordResetTokenPayload>(token, {
+          secret: this.getConfigString('auth.accessSecret'),
+        });
+
+      if (payload.type !== 'PASSWORD_RESET') {
+        throw new BadRequestException('Invalid or expired recovery token');
+      }
+
+      return payload;
+    } catch {
+      throw new BadRequestException('Invalid or expired recovery token');
+    }
+  }
+
   private computeExpiry(duration: string): Date {
     const durationMs = ms(duration as ms.StringValue);
     if (!durationMs) {
       throw new Error(`Invalid duration: ${duration}`);
     }
     return new Date(Date.now() + durationMs);
+  }
+
+  private durationToMinutes(duration: string): number {
+    const durationMs = ms(duration as ms.StringValue);
+    if (!durationMs) {
+      throw new Error(`Invalid duration: ${duration}`);
+    }
+    return Math.round(durationMs / 60_000);
   }
 
   private getConfigString(path: string): string {

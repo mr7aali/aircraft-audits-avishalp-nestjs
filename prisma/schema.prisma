@@ -253,6 +253,7 @@ model AccountRecoveryRequest {
   requestedEmail String
   recoveryType   RecoveryType
   tokenHash      String?             @unique
+  verificationCodeHash String?
   expiresAt      DateTime? @db.Timestamptz(3)
   consumedAt     DateTime? @db.Timestamptz(3)
   status         RecoveryStatus      @default(REQUESTED)
@@ -262,6 +263,7 @@ model AccountRecoveryRequest {
   notifications  EmailNotification[]
 
   @@index([requestedEmail, createdAt])
+  @@index([requestedEmail, recoveryType, status, createdAt])
   @@map("account_recovery_requests")
 }
 
