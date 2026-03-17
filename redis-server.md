@@ -15,10 +15,7 @@ docker pull redis:7
 ## 2️⃣ Run Redis Container
 
 ```bash
-docker run -d \
-  --name redis-server \
-  -p 6379:6379 \
-  redis:7
+docker run -d  --name redis-server   -p 6379:6379   redis:7
 ```
 
 | Flag                  | Description                  |
