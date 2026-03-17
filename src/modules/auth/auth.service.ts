@@ -222,7 +222,9 @@ export class AuthService {
     return { user: dbUser, session };
   }
 
-  async forgotPasswordRequest(dto: ForgotPasswordRequestDto): Promise<void> {
+  async forgotPasswordRequest(
+    dto: ForgotPasswordRequestDto,
+  ): Promise<{ recoveryToken: string }> {
     const emailInput = dto.email.trim().toLowerCase();
     const user = await this.prisma.user.findFirst({
       where: { email: { equals: emailInput, mode: 'insensitive' } },
@@ -262,6 +264,8 @@ export class AuthService {
         resetLink,
       },
     });
+
+    return { recoveryToken: token };
   }
 
   async forgotPasswordConfirm(dto: ForgotPasswordConfirmDto): Promise<void> {
@@ -309,7 +313,10 @@ export class AuthService {
     });
 
     if (!user) {
-      return;
+      throw new BadRequestException({
+        message: 'This email is not registered in our system.',
+        code: 'EMAIL_NOT_REGISTERED',
+      });
     }
 
     const requestRecord = await this.prisma.accountRecoveryRequest.create({

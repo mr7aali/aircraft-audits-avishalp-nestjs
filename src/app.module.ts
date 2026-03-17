@@ -23,6 +23,7 @@ import { EndOfShiftReportsModule } from './modules/end-of-shift-reports/end-of-s
 import { EmployeeOneOnOnesModule } from './modules/employee-one-on-ones/employee-one-on-ones.module.js';
 import { FeedbackModule } from './modules/feedback/feedback.module.js';
 import { ChatModule } from './modules/chat/chat.module.js';
+import { CommonModule } from './common/common.module.js';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { ChatModule } from './modules/chat/chat.module.js';
         },
       }),
     }),
+    CommonModule,
     PrismaModule,
     AuthModule,
     StationsModule,

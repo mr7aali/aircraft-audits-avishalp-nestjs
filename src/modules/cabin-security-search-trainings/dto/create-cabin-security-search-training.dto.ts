@@ -9,13 +9,21 @@ import {
   IsUUID,
   MaxLength,
   ValidateNested,
+  ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class SecurityTrainingAreaResultInputDto {
-  @ApiProperty()
+  @ApiPropertyOptional()
+  @ValidateIf((object: SecurityTrainingAreaResultInputDto) => !object.areaLabel)
   @IsUUID()
   areaId!: string;
+
+  @ApiPropertyOptional()
+  @ValidateIf((object: SecurityTrainingAreaResultInputDto) => !object.areaId)
+  @IsString()
+  @MaxLength(150)
+  areaLabel?: string;
 
   @ApiProperty({ enum: PassFail })
   @IsEnum(PassFail)

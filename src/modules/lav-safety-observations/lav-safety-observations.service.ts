@@ -10,15 +10,25 @@ import { AuthenticatedUser } from '../../common/types/authenticated-user.type.js
 import { buildPaginatedResult } from '../../common/utils/pagination.util.js';
 import { CreateLavSafetyObservationDto } from './dto/create-lav-safety-observation.dto.js';
 import { ListLavSafetyObservationsDto } from './dto/list-lav-safety-observations.dto.js';
+import { ShiftContextService } from '../../common/services/shift-context.service.js';
 
 @Injectable()
 export class LavSafetyObservationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly shiftContextService: ShiftContextService,
+  ) {}
 
   async create(user: AuthenticatedUser, dto: CreateLavSafetyObservationDto) {
     if (!user.activeStationId) {
       throw new ForbiddenException('Active station is required');
     }
+
+    const resolvedShiftOccurrenceId =
+      dto.shiftOccurrenceId ??
+      (await this.shiftContextService.resolveCurrentShiftOccurrenceId(
+        user.activeStationId,
+      ));
 
     const [stationAccess, gate, checklistItems] = await Promise.all([
       this.prisma.userStationAccess.findUnique({
@@ -68,7 +78,7 @@ export class LavSafetyObservationsService {
       const created = await tx.lavSafetyObservation.create({
         data: {
           stationId: user.activeStationId!,
-          shiftOccurrenceId: dto.shiftOccurrenceId,
+          shiftOccurrenceId: resolvedShiftOccurrenceId,
           gateId: dto.gateId,
           auditorUserId: user.id,
           auditorNameSnapshot: `${stationAccess.user.firstName} ${stationAccess.user.lastName}`,

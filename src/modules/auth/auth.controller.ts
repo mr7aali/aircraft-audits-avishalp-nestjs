@@ -64,9 +64,10 @@ export class AuthController {
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
   @Post('forgot-password/request')
   async forgotPasswordRequest(@Body() dto: ForgotPasswordRequestDto) {
-    await this.authService.forgotPasswordRequest(dto);
+    const recovery = await this.authService.forgotPasswordRequest(dto);
     return {
       message: 'If the email is registered, recovery details were sent.',
+      ...recovery,
     };
   }
 

@@ -1,6 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { DelayType } from '../../../generated/prisma/enums.js';
 import {
+  IsArray,
   IsDateString,
   IsEnum,
   IsInt,
@@ -10,6 +11,7 @@ import {
   Min,
 } from 'class-validator';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto.js';
+import { Transform } from 'class-transformer';
 
 export class ListEndOfShiftReportsDto extends PaginationQueryDto {
   @ApiPropertyOptional()
@@ -57,4 +59,25 @@ export class ListEndOfShiftReportsDto extends PaginationQueryDto {
   @IsOptional()
   @IsEnum(DelayType)
   delayType?: DelayType;
+
+  @ApiPropertyOptional({ enum: DelayType, isArray: true })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (Array.isArray(value)) {
+      return value
+        .flatMap((entry) => String(entry).split(','))
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+    }
+    if (typeof value === 'string') {
+      return value
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+    }
+    return [];
+  })
+  @IsArray()
+  @IsEnum(DelayType, { each: true })
+  delayTypes?: DelayType[];
 }
