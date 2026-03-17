@@ -33,9 +33,62 @@ import { CommonModule } from './common/common.module.js';
       load: [configuration],
       validationSchema: envValidationSchema,
     }),
-    LoggerModule.forRoot({
-      pinoHttp: {
-        level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+    LoggerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        const isProduction =
+          configService.get<string>('nodeEnv', { infer: true }) ===
+          'production';
+
+        return {
+          pinoHttp: {
+            level: isProduction ? 'info' : 'debug',
+            transport: isProduction
+              ? undefined
+              : {
+                  target: 'pino-pretty',
+                  options: {
+                    colorize: true,
+                    translateTime: 'SYS:yyyy-mm-dd HH:MM:ss',
+                    singleLine: false,
+                    ignore: 'pid,hostname',
+                  },
+                },
+            customLogLevel: (_req, res, err) => {
+              if (err || res.statusCode >= 500) {
+                return 'error';
+              }
+              if (res.statusCode >= 400) {
+                return 'warn';
+              }
+              return 'info';
+            },
+            customSuccessMessage: (req, res) =>
+              `${req.method} ${req.url} completed ${res.statusCode}`,
+            customErrorMessage: (req, res, err) =>
+              `${req.method} ${req.url} failed ${res.statusCode}${
+                err?.message ? `: ${err.message}` : ''
+              }`,
+            serializers: {
+              req: (req) => ({
+                method: req.method,
+                url: req.url,
+                params: req.params,
+                query: req.query,
+                remoteAddress: req.socket?.remoteAddress,
+                remotePort: req.socket?.remotePort,
+              }),
+              res: (res) => ({
+                statusCode: res.statusCode,
+              }),
+              err: (err) => ({
+                type: err.name,
+                message: err.message,
+                stack: err.stack,
+              }),
+            },
+          },
+        };
       },
     }),
     ThrottlerModule.forRoot({
