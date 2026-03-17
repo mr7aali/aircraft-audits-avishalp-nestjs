@@ -14,17 +14,50 @@ export class ResponseInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       map((data) => {
-        if (data?.success !== undefined) {
-          return data;
+        const normalizedData = this.normalizeForJson(data);
+
+        if (
+          typeof normalizedData === 'object' &&
+          normalizedData !== null &&
+          'success' in normalizedData
+        ) {
+          return normalizedData;
         }
 
         return {
           success: true,
           statusCode,
           message: statusCode === 201 ? 'Created successfully' : 'Success',
-          data,
+          data: normalizedData,
         };
       }),
+    );
+  }
+
+  private normalizeForJson(value: unknown): unknown {
+    if (typeof value === 'bigint') {
+      const numberValue = Number(value);
+      return Number.isSafeInteger(numberValue) ? numberValue : value.toString();
+    }
+
+    if (
+      value == null ||
+      value instanceof Date ||
+      value instanceof Buffer ||
+      typeof value !== 'object'
+    ) {
+      return value;
+    }
+
+    if (Array.isArray(value)) {
+      return value.map((entry) => this.normalizeForJson(entry));
+    }
+
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, entry]) => [
+        key,
+        this.normalizeForJson(entry),
+      ]),
     );
   }
 }
