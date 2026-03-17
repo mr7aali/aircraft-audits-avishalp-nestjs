@@ -16,14 +16,23 @@ async function main() {
   const passwordHash = await argon2.hash('Password@123');
 
   const roleCodes = ['VP', 'GM', 'DM', 'SUP', 'ALL', 'EMPLOYEE', 'HR_ADMIN'] as const;
+  const roleNames: Record<(typeof roleCodes)[number], string> = {
+    VP: 'Vice President',
+    GM: 'General Manager',
+    DM: 'Duty Manager',
+    SUP: 'Supervisor',
+    ALL: 'All',
+    EMPLOYEE: 'Employee',
+    HR_ADMIN: 'HR Admin',
+  };
   const roles = await Promise.all(
     roleCodes.map((code) =>
       prisma.role.upsert({
         where: { code },
-        update: { name: code.replace('_', ' ') },
+        update: { name: roleNames[code] },
         create: {
           code,
-          name: code.replace('_', ' '),
+          name: roleNames[code],
         },
       }),
     ),
@@ -199,12 +208,19 @@ async function main() {
     }
   }
 
-  const cleanTypes = ['CHARTER', 'DIVERSION', 'DSC_TURN', 'MSGT_TURN', 'RAD', 'RON'];
-  for (const [index, code] of cleanTypes.entries()) {
+  const cleanTypes = [
+    ['CHARTER', 'Charter'],
+    ['DIVERSION', 'Diversion'],
+    ['DSC_TURN', 'DSC Turn (Normal)'],
+    ['MSGT_TURN', 'MSGT Turn (Quick)'],
+    ['RAD', 'RAD - Remain All Day (4+ Hours)'],
+    ['RON', 'RON - Remain Over Night'],
+  ] as const;
+  for (const [index, [code, name]] of cleanTypes.entries()) {
     await prisma.cleanType.upsert({
       where: { code },
-      update: { name: code, sortOrder: index + 1, isActive: true },
-      create: { code, name: code, sortOrder: index + 1, isActive: true },
+      update: { name, sortOrder: index + 1, isActive: true },
+      create: { code, name, sortOrder: index + 1, isActive: true },
     });
   }
 

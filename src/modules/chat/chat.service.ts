@@ -85,13 +85,19 @@ export class ChatService {
             user: {
               select: {
                 id: true,
+                uid: true,
+                email: true,
                 firstName: true,
                 lastName: true,
               },
             },
           },
         },
-        lastMessage: true,
+        lastMessage: {
+          include: {
+            receipts: true,
+          },
+        },
       },
       orderBy: { lastMessageAt: 'desc' },
       take: 50,
@@ -122,6 +128,13 @@ export class ChatService {
               : 'Direct Chat'
             : (conversation.title ?? 'Group');
 
+        const lastMessageStatus =
+          conversation.lastMessage?.senderUserId === user.id
+            ? this.resolveMessageReceiptStatus(
+                conversation.lastMessage.receipts,
+              )
+            : null;
+
         return {
           id: conversation.id,
           type: conversation.conversationType,
@@ -131,9 +144,22 @@ export class ChatService {
           unreadCount,
           isFavorite: participant?.isFavorite ?? false,
           isMuted: participant?.isMuted ?? false,
+          isOnline: otherParticipant
+            ? this.realtime.isUserOnline(otherParticipant.userId)
+            : false,
+          otherParticipant: otherParticipant
+            ? {
+                id: otherParticipant.user.id,
+                uid: otherParticipant.user.uid,
+                email: otherParticipant.user.email,
+                name: `${otherParticipant.user.firstName} ${otherParticipant.user.lastName}`,
+              }
+            : null,
           lastMessagePreview: this.resolvePreview(
             conversation.lastMessage?.messageType,
+            conversation.lastMessage?.previewText,
           ),
+          lastMessageStatus,
         };
       }),
     );
@@ -256,6 +282,14 @@ export class ChatService {
       include: {
         files: true,
         receipts: true,
+        senderUser: {
+          select: {
+            id: true,
+            uid: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
         poll: {
           include: {
             options: {
@@ -274,7 +308,14 @@ export class ChatService {
     });
 
     return {
-      items: messages,
+      items: messages.map((message) => ({
+        ...message,
+        sender: {
+          id: message.senderUser.id,
+          uid: message.senderUser.uid,
+          name: `${message.senderUser.firstName} ${message.senderUser.lastName}`,
+        },
+      })),
       nextCursor: messages.length ? messages[messages.length - 1].id : null,
     };
   }
@@ -683,7 +724,10 @@ export class ChatService {
     }
   }
 
-  private resolvePreview(messageType?: MessageType): string {
+  private resolvePreview(
+    messageType?: MessageType,
+    previewText?: string | null,
+  ): string {
     switch (messageType) {
       case MessageType.IMAGE:
         return 'Photo';
@@ -704,8 +748,24 @@ export class ChatService {
       case MessageType.SYSTEM:
         return 'System';
       case MessageType.TEXT:
+        return previewText?.trim() || 'Message';
       default:
-        return 'Message';
+        return previewText?.trim() || 'Message';
     }
+  }
+
+  private resolveMessageReceiptStatus(
+    receipts: Array<{ deliveredAt: Date | null; readAt: Date | null }>,
+  ): 'sent' | 'delivered' | 'read' {
+    if (!receipts.length) {
+      return 'sent';
+    }
+    if (receipts.every((receipt) => receipt.readAt)) {
+      return 'read';
+    }
+    if (receipts.every((receipt) => receipt.deliveredAt)) {
+      return 'delivered';
+    }
+    return 'sent';
   }
 }

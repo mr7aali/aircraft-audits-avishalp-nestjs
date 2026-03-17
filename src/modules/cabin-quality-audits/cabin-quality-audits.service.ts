@@ -10,15 +10,25 @@ import { AuthenticatedUser } from '../../common/types/authenticated-user.type.js
 import { buildPaginatedResult } from '../../common/utils/pagination.util.js';
 import { CreateCabinQualityAuditDto } from './dto/create-cabin-quality-audit.dto.js';
 import { ListCabinQualityAuditsDto } from './dto/list-cabin-quality-audits.dto.js';
+import { ShiftContextService } from '../../common/services/shift-context.service.js';
 
 @Injectable()
 export class CabinQualityAuditsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly shiftContextService: ShiftContextService,
+  ) {}
 
   async create(user: AuthenticatedUser, dto: CreateCabinQualityAuditDto) {
     if (!user.activeStationId) {
       throw new ForbiddenException('Active station is required');
     }
+
+    const resolvedShiftOccurrenceId =
+      dto.shiftOccurrenceId ??
+      (await this.shiftContextService.resolveCurrentShiftOccurrenceId(
+        user.activeStationId,
+      ));
 
     const [stationAccess, gate, cleanType, checklistItems] = await Promise.all([
       this.prisma.userStationAccess.findUnique({
@@ -68,11 +78,28 @@ export class CabinQualityAuditsService {
       }
     }
 
+    if (resolvedShiftOccurrenceId) {
+      const existingAudit = await this.prisma.cabinQualityAudit.findFirst({
+        where: {
+          stationId: user.activeStationId,
+          shiftOccurrenceId: resolvedShiftOccurrenceId,
+          status: 'SUBMITTED',
+        },
+        select: { id: true },
+      });
+
+      if (existingAudit) {
+        throw new BadRequestException(
+          'A cabin quality audit has already been submitted for the current shift',
+        );
+      }
+    }
+
     const audit = await this.prisma.$transaction(async (tx) => {
       const created = await tx.cabinQualityAudit.create({
         data: {
           stationId: user.activeStationId!,
-          shiftOccurrenceId: dto.shiftOccurrenceId,
+          shiftOccurrenceId: resolvedShiftOccurrenceId,
           gateId: gate.id,
           cleanTypeId: cleanType.id,
           auditorUserId: user.id,

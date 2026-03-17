@@ -11,10 +11,28 @@ import { AuthenticatedUser } from '../../common/types/authenticated-user.type.js
 import { buildPaginatedResult } from '../../common/utils/pagination.util.js';
 import { CreateCabinSecuritySearchTrainingDto } from './dto/create-cabin-security-search-training.dto.js';
 import { ListCabinSecuritySearchTrainingsDto } from './dto/list-cabin-security-search-trainings.dto.js';
+import { ShiftContextService } from '../../common/services/shift-context.service.js';
+import { randomUUID } from 'crypto';
+
+type ResolvedSecuritySearchArea = {
+  id: string;
+  code: string;
+  label: string;
+  sortOrder: number;
+  isActive: boolean;
+};
+
+type ResolvedAreaEntry = {
+  area: ResolvedSecuritySearchArea;
+  result: CreateCabinSecuritySearchTrainingDto['areaResults'][number];
+};
 
 @Injectable()
 export class CabinSecuritySearchTrainingsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly shiftContextService: ShiftContextService,
+  ) {}
 
   async create(
     user: AuthenticatedUser,
@@ -23,6 +41,12 @@ export class CabinSecuritySearchTrainingsService {
     if (!user.activeStationId) {
       throw new ForbiddenException('Active station is required');
     }
+
+    const resolvedShiftOccurrenceId =
+      dto.shiftOccurrenceId ??
+      (await this.shiftContextService.resolveCurrentShiftOccurrenceId(
+        user.activeStationId,
+      ));
 
     const [stationAccess, gate, areas] = await Promise.all([
       this.prisma.userStationAccess.findUnique({
@@ -46,15 +70,15 @@ export class CabinSecuritySearchTrainingsService {
     if (!gate || gate.stationId !== user.activeStationId) {
       throw new BadRequestException('Invalid gate for active station');
     }
-    const validAreaIds = new Set(areas.map((area) => area.id));
-    const uniqueAreaIds = new Set(dto.areaResults.map((item) => item.areaId));
-    if (uniqueAreaIds.size !== dto.areaResults.length) {
+    const uniqueAreaKeys = new Set(
+      dto.areaResults.map((item) =>
+        item.areaId
+          ? `id:${item.areaId}`
+          : `label:${item.areaLabel?.trim().toLowerCase()}`,
+      ),
+    );
+    if (uniqueAreaKeys.size !== dto.areaResults.length) {
       throw new BadRequestException('Duplicate areas are not allowed');
-    }
-    for (const result of dto.areaResults) {
-      if (!validAreaIds.has(result.areaId)) {
-        throw new BadRequestException('Invalid selected area');
-      }
     }
 
     const overallResult = dto.areaResults.some(
@@ -64,10 +88,26 @@ export class CabinSecuritySearchTrainingsService {
       : PassFail.PASS;
 
     const training = await this.prisma.$transaction(async (tx) => {
+      const knownAreasById = new Map(areas.map((area) => [area.id, area]));
+      const knownAreasByLabel = new Map(
+        areas.map((area) => [area.label.trim().toLowerCase(), area]),
+      );
+      const resolvedAreaEntries: ResolvedAreaEntry[] = [];
+
+      for (const result of dto.areaResults) {
+        const area = await this.resolveAreaForResult(
+          tx,
+          result,
+          knownAreasById,
+          knownAreasByLabel,
+        );
+        resolvedAreaEntries.push({ area, result });
+      }
+
       const created = await tx.cabinSecuritySearchTraining.create({
         data: {
           stationId: user.activeStationId!,
-          shiftOccurrenceId: dto.shiftOccurrenceId,
+          shiftOccurrenceId: resolvedShiftOccurrenceId,
           gateId: dto.gateId,
           auditorUserId: user.id,
           auditorNameSnapshot: `${stationAccess.user.firstName} ${stationAccess.user.lastName}`,
@@ -81,21 +121,20 @@ export class CabinSecuritySearchTrainingsService {
         },
       });
 
-      for (const result of dto.areaResults) {
-        const area = areas.find((item) => item.id === result.areaId)!;
+      for (const entry of resolvedAreaEntries) {
         const createdResult = await tx.cabinSecuritySearchTrainingResult.create(
           {
             data: {
               trainingId: created.id,
-              areaId: area.id,
-              areaLabelSnapshot: area.label,
-              result: result.result,
+              areaId: entry.area.id,
+              areaLabelSnapshot: entry.area.label,
+              result: entry.result.result,
             },
           },
         );
-        if (result.imageFileIds?.length) {
+        if (entry.result.imageFileIds?.length) {
           await tx.cabinSecuritySearchTrainingResultFile.createMany({
-            data: result.imageFileIds.map((fileId, index) => ({
+            data: entry.result.imageFileIds.map((fileId, index) => ({
               resultId: createdResult.id,
               fileId,
               sortOrder: index,
@@ -127,6 +166,7 @@ export class CabinSecuritySearchTrainingsService {
     if (!user.activeStationId) {
       throw new ForbiddenException('Active station is required');
     }
+    const selectedResults = this.normalizeSelectedResults(query);
     const where: Prisma.CabinSecuritySearchTrainingWhereInput = {
       stationId: user.activeStationId,
       ...(query.fromDate || query.toDate
@@ -145,7 +185,9 @@ export class CabinSecuritySearchTrainingsService {
             },
           }
         : {}),
-      ...(query.result ? { overallResult: query.result } : {}),
+      ...(selectedResults.length === 1
+        ? { overallResult: selectedResults[0] }
+        : {}),
       ...(query.gateId ? { gateId: query.gateId } : {}),
     };
     const [items, total] = await Promise.all([
@@ -204,5 +246,68 @@ export class CabinSecuritySearchTrainingsService {
       throw new NotFoundException('Cabin security search training not found');
     }
     return training;
+  }
+
+  private normalizeSelectedResults(query: ListCabinSecuritySearchTrainingsDto) {
+    const values = new Set(
+      [
+        ...(query.results ?? []),
+        ...(query.result ? [query.result] : []),
+      ].filter(Boolean),
+    );
+    return Array.from(values);
+  }
+
+  private async resolveAreaForResult(
+    tx: Prisma.TransactionClient,
+    result: CreateCabinSecuritySearchTrainingDto['areaResults'][number],
+    knownAreasById: Map<string, ResolvedSecuritySearchArea>,
+    knownAreasByLabel: Map<string, ResolvedSecuritySearchArea>,
+  ) {
+    if (result.areaId) {
+      const matched = knownAreasById.get(result.areaId);
+      if (!matched) {
+        throw new BadRequestException('Invalid selected area');
+      }
+      return matched;
+    }
+
+    const label = result.areaLabel?.trim();
+    if (!label) {
+      throw new BadRequestException(
+        'Each area result must include areaId or areaLabel',
+      );
+    }
+
+    const existing = knownAreasByLabel.get(label.toLowerCase());
+    if (existing) {
+      return existing;
+    }
+
+    const sortOrder = knownAreasByLabel.size + 1;
+    const created = await tx.securitySearchArea.create({
+      data: {
+        code: this.buildAreaCode(label),
+        label,
+        sortOrder,
+        isActive: true,
+      },
+    });
+
+    knownAreasById.set(created.id, created);
+    knownAreasByLabel.set(created.label.toLowerCase(), created);
+
+    return created;
+  }
+
+  private buildAreaCode(label: string): string {
+    const baseCode = label
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 50);
+
+    return `${baseCode || 'AREA'}_${randomUUID().slice(0, 8).toUpperCase()}`;
   }
 }

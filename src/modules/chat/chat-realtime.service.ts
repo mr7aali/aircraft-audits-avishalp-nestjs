@@ -20,6 +20,10 @@ export class ChatRealtimeService {
     this.broadcastPresence(userId, false);
   }
 
+  isUserOnline(userId: string): boolean {
+    return this.onlineUsers.has(userId);
+  }
+
   emitMessageCreated(conversationId: string, payload: unknown): void {
     this.server
       ?.to(`conversation:${conversationId}`)

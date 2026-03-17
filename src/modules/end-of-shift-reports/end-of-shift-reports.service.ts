@@ -10,16 +10,25 @@ import { AuthenticatedUser } from '../../common/types/authenticated-user.type.js
 import { buildPaginatedResult } from '../../common/utils/pagination.util.js';
 import { CreateEndOfShiftReportDto } from './dto/create-end-of-shift-report.dto.js';
 import { ListEndOfShiftReportsDto } from './dto/list-end-of-shift-reports.dto.js';
+import { ShiftContextService } from '../../common/services/shift-context.service.js';
 
 @Injectable()
 export class EndOfShiftReportsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly shiftContextService: ShiftContextService,
+  ) {}
 
   async create(user: AuthenticatedUser, dto: CreateEndOfShiftReportDto) {
     if (!user.activeStationId) {
       throw new ForbiddenException('Active station is required');
     }
     this.validateDto(dto);
+    const resolvedShiftOccurrenceId =
+      dto.shiftOccurrenceId ??
+      (await this.shiftContextService.resolveCurrentShiftOccurrenceId(
+        user.activeStationId,
+      ));
     const stationAccess = await this.prisma.userStationAccess.findUnique({
       where: {
         userId_stationId: {
@@ -37,7 +46,7 @@ export class EndOfShiftReportsService {
       const created = await tx.endOfShiftReport.create({
         data: {
           stationId: user.activeStationId!,
-          shiftOccurrenceId: dto.shiftOccurrenceId,
+          shiftOccurrenceId: resolvedShiftOccurrenceId,
           supervisorUserId: user.id,
           supervisorNameSnapshot: `${stationAccess.user.firstName} ${stationAccess.user.lastName}`,
           supervisorRoleSnapshot: stationAccess.role.name,
@@ -90,6 +99,8 @@ export class EndOfShiftReportsService {
       throw new ForbiddenException('Active station is required');
     }
 
+    const selectedDelayTypes = this.normalizeDelayTypes(query);
+
     const where: Prisma.EndOfShiftReportWhereInput = {
       stationId: user.activeStationId,
       ...(query.fromDate || query.toDate
@@ -116,7 +127,7 @@ export class EndOfShiftReportsService {
         : {}),
       ...(query.delayCodeAlpha ||
       typeof query.delayCodeNumber === 'number' ||
-      query.delayType
+      selectedDelayTypes.length === 1
         ? {
             delays: {
               some: {
@@ -126,7 +137,9 @@ export class EndOfShiftReportsService {
                 ...(typeof query.delayCodeNumber === 'number'
                   ? { delayCodeNumber: query.delayCodeNumber }
                   : {}),
-                ...(query.delayType ? { delayType: query.delayType } : {}),
+                ...(selectedDelayTypes.length === 1
+                  ? { delayType: selectedDelayTypes[0] }
+                  : {}),
               },
             },
           }
@@ -189,6 +202,16 @@ export class EndOfShiftReportsService {
       throw new NotFoundException('End of shift report not found');
     }
     return report;
+  }
+
+  private normalizeDelayTypes(query: ListEndOfShiftReportsDto) {
+    const uniqueTypes = new Set(
+      [
+        ...(query.delayTypes ?? []),
+        ...(query.delayType ? [query.delayType] : []),
+      ].filter(Boolean),
+    );
+    return Array.from(uniqueTypes);
   }
 
   private validateDto(dto: CreateEndOfShiftReportDto): void {
