@@ -9,6 +9,16 @@ This document is for local development only.
 - Do not use the seeded users or passwords in production.
 - The seed is designed to be re-runnable. Most records are created with Prisma `upsert`, so running the seed again updates the same development records instead of duplicating them.
 
+## Working directory
+
+All commands in this guide assume PowerShell opened in the backend project root:
+
+```powershell
+cd d:\app-dev\aircraft\aircraft-audits-avishalp-nestjs
+```
+
+If you run commands from the monorepo root instead, prefix them with the backend path or change into the backend directory first.
+
 ## What the seed creates
 
 Running `yarn prisma:seed` populates the development database with:
@@ -71,8 +81,6 @@ These are the default development values from [`.env.example`](../.env.example) 
 | Secret key | `minioadmin` |
 
 ## Standard development seed flow
-
-The commands below assume PowerShell from the project root.
 
 ### 1. Install dependencies
 
@@ -170,8 +178,8 @@ Notes:
 
 - This is destructive. All local database data will be lost.
 - The script is defined as `prisma migrate reset --force`.
-- Prisma resets the database and reapplies migrations.
-- If you want to be explicit after the reset, run `yarn prisma:seed` again.
+- Prisma resets the database, reapplies migrations, and then runs the configured seed because `package.json` defines a Prisma seed command.
+- You only need to run `yarn prisma:seed` again after `yarn db:reset` if you intentionally skipped the seed or want to re-run it once more.
 
 ## Seeded application login credentials
 
@@ -209,6 +217,25 @@ Chat endpoints are the main exception because chat is not station-scoped in this
 
 ## Login and station-selection flow
 
+### API response envelope
+
+Most endpoints in this backend are wrapped by the global response interceptor.
+
+That means successful responses usually look like this shape:
+
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Success",
+  "data": {
+    "...": "..."
+  }
+}
+```
+
+For `201` responses, the message is usually `Created successfully`.
+
 ### Step 1. Log in
 
 Endpoint:
@@ -239,10 +266,15 @@ Successful response shape:
 
 ```json
 {
-  "accessToken": "<jwt>",
-  "refreshToken": "<opaque-token>",
-  "accessTokenExpiresIn": "30m",
-  "refreshTokenExpiresAt": "2026-03-27T10:15:00.000Z"
+  "success": true,
+  "statusCode": 201,
+  "message": "Created successfully",
+  "data": {
+    "accessToken": "<jwt>",
+    "refreshToken": "<opaque-token>",
+    "accessTokenExpiresIn": "30m",
+    "refreshTokenExpiresAt": "2026-03-27T10:15:00.000Z"
+  }
 }
 ```
 
@@ -271,7 +303,31 @@ Expected behavior:
 
 - Users with one station will get `autoSelectSuggested: true`
 - `sup.user` will receive both `JFK` and `LAX`
-- You need the `stationId` value from this response for the next step
+- You need the `stationId` value from `data.stations[*].stationId` for the next step
+
+Sample success shape:
+
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Success",
+  "data": {
+    "stations": [
+      {
+        "stationId": "<station-id>",
+        "stationCode": "JFK",
+        "stationName": "John F. Kennedy",
+        "timezone": "America/New_York",
+        "roleCode": "SUP",
+        "roleName": "Supervisor",
+        "isDefault": true
+      }
+    ],
+    "autoSelectSuggested": false
+  }
+}
+```
 
 ### Step 3. Select the active station
 
