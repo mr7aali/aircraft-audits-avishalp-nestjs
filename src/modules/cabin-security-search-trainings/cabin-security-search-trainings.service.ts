@@ -88,6 +88,23 @@ export class CabinSecuritySearchTrainingsService {
       : PassFail.PASS;
 
     const training = await this.prisma.$transaction(async (tx) => {
+      const detailedResultsJson =
+        dto.detailedAreaResults == null
+          ? undefined
+          : (dto.detailedAreaResults.map((area) => ({
+              areaId: area.areaId.trim(),
+              sectionLabel: area.sectionLabel.trim(),
+              imageFileIds: area.imageFileIds ?? [],
+              checkItems: area.checkItems.map((checkItem) => ({
+                itemName: checkItem.itemName.trim(),
+                status: checkItem.status,
+                imageFileIds: checkItem.imageFileIds ?? [],
+                hashtags: (checkItem.hashtags ?? [])
+                  .map((tag) => tag.trim())
+                  .filter((tag) => tag.length > 0),
+              })),
+            })) as Prisma.InputJsonValue);
+
       const knownAreasById = new Map(areas.map((area) => [area.id, area]));
       const knownAreasByLabel = new Map(
         areas.map((area) => [area.label.trim().toLowerCase(), area]),
@@ -114,6 +131,7 @@ export class CabinSecuritySearchTrainingsService {
           auditorRoleSnapshot: stationAccess.role.name,
           gateCodeSnapshot: gate.gateCode,
           shipNumber: dto.shipNumber,
+          detailedResultsJson,
           otherFindings: dto.otherFindings,
           additionalNotes: dto.additionalNotes,
           overallResult,

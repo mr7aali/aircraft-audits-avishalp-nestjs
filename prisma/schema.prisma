@@ -493,6 +493,7 @@ model CabinSecuritySearchTraining {
   gateCodeSnapshot    String
   trainingAt          DateTime @db.Timestamptz(3)                            @default(now())
   shipNumber          String
+  detailedResultsJson Json?
   otherFindings       String?
   additionalNotes     String?
   overallResult       PassFail
