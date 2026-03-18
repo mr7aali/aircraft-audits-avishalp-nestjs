@@ -94,7 +94,11 @@ See `.env.example` for full list. Core values:
 - `JWT_REMEMBER_ME_TTL` (default `60d`)
 - `REDIS_*`
 - `MAIL_*`
-- `STORAGE_DRIVER` (`local` or `s3`)
+- `STORAGE_DRIVER` (`cloudinary`, `local`, or `s3`)
+- `CLOUDINARY_CLOUD_NAME`
+- `CLOUDINARY_API_KEY`
+- `CLOUDINARY_API_SECRET`
+- `CLOUDINARY_FOLDER` (optional)
 - `MAX_UPLOAD_BYTES` (default `104857600`)
 
 ## Seeded Sample Users
@@ -117,6 +121,7 @@ Full credential details, role/station mapping, and login flow:
 - Station-scoped modules require active selected station.
 - Submitted operational records are immutable through API surface (no update endpoints).
 - File uploads are size-limited to 100MB and stored outside PostgreSQL.
+- Cloudinary is the recommended shared media backend for images and signatures.
 - Employee 1:1 reads are restricted to leader/employee/HR admin.
 
 ## Chat Encryption Boundary

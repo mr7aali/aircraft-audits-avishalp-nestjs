@@ -6,6 +6,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import type { File as StoredFileRecord } from '../../../generated/prisma/client.js';
 import { StorageAdapter, StoredFileResult } from './storage.adapter.js';
 
 @Injectable()
@@ -55,12 +56,12 @@ export class S3StorageAdapter implements StorageAdapter {
     return { storageKey: key };
   }
 
-  async getDownloadUrl(key: string): Promise<string> {
+  async getDownloadUrl(file: StoredFileRecord): Promise<string> {
     return getSignedUrl(
       this.client,
       new GetObjectCommand({
         Bucket: this.bucket,
-        Key: key,
+        Key: file.storageKey,
       }),
       { expiresIn: 600 },
     );

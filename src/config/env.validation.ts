@@ -24,8 +24,26 @@ export const envValidationSchema = Joi.object({
   MAIL_SECURE: Joi.boolean().truthy('true').falsy('false').default(false),
   MAIL_USER: Joi.string().allow('').optional(),
   MAIL_PASS: Joi.string().allow('').optional(),
-  STORAGE_DRIVER: Joi.string().valid('local', 's3').default('local'),
+  STORAGE_DRIVER: Joi.string()
+    .valid('local', 's3', 'cloudinary')
+    .default('local'),
   STORAGE_LOCAL_ROOT: Joi.string().default('storage'),
+  CLOUDINARY_CLOUD_NAME: Joi.when('STORAGE_DRIVER', {
+    is: 'cloudinary',
+    then: Joi.string().required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+  CLOUDINARY_API_KEY: Joi.when('STORAGE_DRIVER', {
+    is: 'cloudinary',
+    then: Joi.string().required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+  CLOUDINARY_API_SECRET: Joi.when('STORAGE_DRIVER', {
+    is: 'cloudinary',
+    then: Joi.string().required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+  CLOUDINARY_FOLDER: Joi.string().allow('').optional(),
   S3_REGION: Joi.string().allow('').optional(),
   S3_BUCKET: Joi.string().allow('').optional(),
   S3_ENDPOINT: Joi.string().allow('').optional(),

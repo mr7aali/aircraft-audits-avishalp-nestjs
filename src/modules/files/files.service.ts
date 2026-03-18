@@ -6,10 +6,12 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { extname } from 'path';
 import { randomUUID } from 'crypto';
+import { Prisma } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuthenticatedUser } from '../../common/types/authenticated-user.type.js';
 import { UploadFileDto } from './dto/upload-file.dto.js';
 import { FileScanService } from './scanner/file-scan.service.js';
+import { CloudinaryStorageAdapter } from './storage/cloudinary-storage.adapter.js';
 import { LocalStorageAdapter } from './storage/local-storage.adapter.js';
 import { S3StorageAdapter } from './storage/s3-storage.adapter.js';
 import { FileCategory } from '../../generated/prisma/enums.js';
@@ -20,6 +22,7 @@ export class FilesService {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly fileScanService: FileScanService,
+    private readonly cloudinaryStorageAdapter: CloudinaryStorageAdapter,
     private readonly localStorageAdapter: LocalStorageAdapter,
     private readonly s3StorageAdapter: S3StorageAdapter,
   ) {}
@@ -47,18 +50,19 @@ export class FilesService {
     const storageKey = `${new Date().toISOString().slice(0, 10)}/${randomUUID()}${extension}`;
 
     const storage = this.getStorage();
-    await storage.store(storageKey, file.buffer, file.mimetype);
+    const stored = await storage.store(storageKey, file.buffer, file.mimetype);
     const scanStatus = await this.fileScanService.scan(file.buffer);
 
     const created = await this.prisma.file.create({
       data: {
-        storageKey,
+        storageKey: stored.storageKey,
         originalFileName: file.originalname,
         mimeType: file.mimetype,
         sizeBytes: BigInt(file.size),
         fileCategory: category,
         scanStatus,
         uploadedByUserId: user.id,
+        metadataJson: stored.metadata as Prisma.InputJsonValue | undefined,
       },
     });
 
@@ -80,31 +84,60 @@ export class FilesService {
     const storage = this.getStorage();
     return {
       fileId: file.id,
-      downloadUrl: await storage.getDownloadUrl(file.storageKey),
+      downloadUrl: await storage.getDownloadUrl(file),
     };
   }
 
-  async resolveLocalPathByFileId(fileId: string): Promise<string> {
-    const file = await this.prisma.file.findUnique({
-      where: { id: fileId },
-    });
-    if (!file) {
-      throw new NotFoundException('File not found');
-    }
+  async getContentTarget(fileId: string): Promise<
+    | {
+        kind: 'local';
+        absolutePath: string;
+        mimeType: string;
+      }
+    | {
+        kind: 'redirect';
+        url: string;
+      }
+  > {
+    const file = await this.getMetadata(fileId);
     const storage = this.getStorage();
-    if (!('getAbsolutePath' in storage) || !storage.getAbsolutePath) {
-      throw new BadRequestException(
-        'Content endpoint only available for local storage',
-      );
+
+    if (this.isLocalDriver()) {
+      if (!('getAbsolutePath' in storage) || !storage.getAbsolutePath) {
+        throw new BadRequestException(
+          'Content endpoint only available for local storage',
+        );
+      }
+
+      return {
+        kind: 'local',
+        absolutePath: storage.getAbsolutePath(file.storageKey),
+        mimeType: file.mimeType,
+      };
     }
-    return storage.getAbsolutePath(file.storageKey);
+
+    return {
+      kind: 'redirect',
+      url: await storage.getDownloadUrl(file),
+    };
   }
 
   private getStorage() {
     const driver = this.configService.get<string>('storage.driver', {
       infer: true,
     });
+    if (driver === 'cloudinary') {
+      return this.cloudinaryStorageAdapter;
+    }
     return driver === 's3' ? this.s3StorageAdapter : this.localStorageAdapter;
+  }
+
+  private isLocalDriver(): boolean {
+    return (
+      this.configService.get<string>('storage.driver', {
+        infer: true,
+      }) === 'local'
+    );
   }
 
   private detectCategory(mimeType: string): FileCategory {

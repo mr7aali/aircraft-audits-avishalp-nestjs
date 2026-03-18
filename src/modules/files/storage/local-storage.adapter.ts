@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { mkdir, writeFile } from 'fs/promises';
 import { dirname, join, resolve } from 'path';
+import type { File as StoredFileRecord } from '../../../generated/prisma/client.js';
 import { StorageAdapter, StoredFileResult } from './storage.adapter.js';
 
 @Injectable()
@@ -27,8 +28,18 @@ export class LocalStorageAdapter implements StorageAdapter {
     return { storageKey: key };
   }
 
-  getDownloadUrl(key: string): Promise<string> {
-    return Promise.resolve(`/api/files/content/${encodeURIComponent(key)}`);
+  getDownloadUrl(file: StoredFileRecord): Promise<string> {
+    const appBaseUrl =
+      this.configService.get<string>('appBaseUrl', {
+        infer: true,
+      }) ?? 'http://localhost:3000';
+    const apiPrefix =
+      this.configService.get<string>('apiPrefix', {
+        infer: true,
+      }) ?? 'api';
+    return Promise.resolve(
+      `${appBaseUrl.replace(/\/$/, '')}/${apiPrefix}/files/${file.id}/content`,
+    );
   }
 
   getAbsolutePath(key: string): string {

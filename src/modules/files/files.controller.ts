@@ -53,7 +53,11 @@ export class FilesController {
 
   @Get(':id/content')
   async getContent(@Param('id') id: string, @Res() res: Response) {
-    const path = await this.filesService.resolveLocalPathByFileId(id);
-    return res.sendFile(path);
+    const target = await this.filesService.getContentTarget(id);
+    if (target.kind === 'local') {
+      res.type(target.mimeType);
+      return res.sendFile(target.absolutePath);
+    }
+    return res.redirect(target.url);
   }
 }

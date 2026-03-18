@@ -1,6 +1,9 @@
+import type { File as StoredFileRecord } from '../../../generated/prisma/client.js';
+
 export interface StoredFileResult {
   storageKey: string;
   publicUrl?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface StorageAdapter {
@@ -9,6 +12,6 @@ export interface StorageAdapter {
     buffer: Buffer,
     mimeType: string,
   ): Promise<StoredFileResult>;
-  getDownloadUrl(key: string): Promise<string>;
+  getDownloadUrl(file: StoredFileRecord): Promise<string>;
   getAbsolutePath?(key: string): string;
 }
