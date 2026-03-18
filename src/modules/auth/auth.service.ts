@@ -217,7 +217,11 @@ export class AuthService {
         email: true,
         firstName: true,
         lastName: true,
+        phone: true,
         status: true,
+        profileImageFileId: true,
+        createdAt: true,
+        lastSeenAt: true,
       },
     });
 

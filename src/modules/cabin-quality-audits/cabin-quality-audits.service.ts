@@ -78,23 +78,6 @@ export class CabinQualityAuditsService {
       }
     }
 
-    if (resolvedShiftOccurrenceId) {
-      const existingAudit = await this.prisma.cabinQualityAudit.findFirst({
-        where: {
-          stationId: user.activeStationId,
-          shiftOccurrenceId: resolvedShiftOccurrenceId,
-          status: 'SUBMITTED',
-        },
-        select: { id: true },
-      });
-
-      if (existingAudit) {
-        throw new BadRequestException(
-          'A cabin quality audit has already been submitted for the current shift',
-        );
-      }
-    }
-
     const audit = await this.prisma.$transaction(async (tx) => {
       const created = await tx.cabinQualityAudit.create({
         data: {
