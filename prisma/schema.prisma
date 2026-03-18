@@ -326,6 +326,7 @@ model CabinQualityAudit {
   gateCodeSnapshot    String
   cleanTypeSnapshot   String
   auditAt             DateTime @db.Timestamptz(3)                    @default(now())
+  detailedResultsJson Json?
   otherFindings       String?
   additionalNotes     String?
   signatureFileId     String                      @db.Uuid

@@ -5,6 +5,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsEnum,
+  IsIn,
   IsOptional,
   IsString,
   IsUUID,
@@ -29,6 +30,49 @@ export class CabinQualityAuditResponseInputDto {
   imageFileIds?: string[];
 }
 
+export class CabinQualityAuditDetailedCheckItemDto {
+  @ApiProperty()
+  @IsString()
+  @MaxLength(200)
+  itemName!: string;
+
+  @ApiProperty({ enum: ['pass', 'fail', 'na'] })
+  @IsIn(['pass', 'fail', 'na'])
+  status!: 'pass' | 'fail' | 'na';
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  imageFileIds?: string[];
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @MaxLength(50, { each: true })
+  hashtags?: string[];
+}
+
+export class CabinQualityAuditDetailedAreaDto {
+  @ApiProperty()
+  @IsString()
+  @MaxLength(100)
+  areaId!: string;
+
+  @ApiProperty()
+  @IsString()
+  @MaxLength(100)
+  sectionLabel!: string;
+
+  @ApiProperty({ type: [CabinQualityAuditDetailedCheckItemDto] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => CabinQualityAuditDetailedCheckItemDto)
+  checkItems!: CabinQualityAuditDetailedCheckItemDto[];
+}
+
 export class CreateCabinQualityAuditDto {
   @ApiProperty()
   @IsUUID()
@@ -50,6 +94,13 @@ export class CreateCabinQualityAuditDto {
   @ValidateNested({ each: true })
   @Type(() => CabinQualityAuditResponseInputDto)
   responses!: CabinQualityAuditResponseInputDto[];
+
+  @ApiPropertyOptional({ type: [CabinQualityAuditDetailedAreaDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CabinQualityAuditDetailedAreaDto)
+  areaResults?: CabinQualityAuditDetailedAreaDto[];
 
   @ApiProperty()
   @IsUUID()

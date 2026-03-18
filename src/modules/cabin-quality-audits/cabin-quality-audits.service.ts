@@ -79,6 +79,22 @@ export class CabinQualityAuditsService {
     }
 
     const audit = await this.prisma.$transaction(async (tx) => {
+      const detailedResultsJson =
+        dto.areaResults == null
+          ? undefined
+          : (dto.areaResults.map((area) => ({
+              areaId: area.areaId.trim(),
+              sectionLabel: area.sectionLabel.trim(),
+              checkItems: area.checkItems.map((checkItem) => ({
+                itemName: checkItem.itemName.trim(),
+                status: checkItem.status,
+                imageFileIds: checkItem.imageFileIds ?? [],
+                hashtags: (checkItem.hashtags ?? [])
+                  .map((tag) => tag.trim())
+                  .filter((tag) => tag.length > 0),
+              })),
+            })) as Prisma.InputJsonValue);
+
       const created = await tx.cabinQualityAudit.create({
         data: {
           stationId: user.activeStationId!,
@@ -90,6 +106,7 @@ export class CabinQualityAuditsService {
           auditorRoleSnapshot: stationAccess.role.name,
           gateCodeSnapshot: gate.gateCode,
           cleanTypeSnapshot: cleanType.name,
+          detailedResultsJson,
           otherFindings: dto.otherFindings,
           additionalNotes: dto.additionalNotes,
           signatureFileId: dto.signatureFileId,
