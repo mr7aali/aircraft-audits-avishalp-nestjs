@@ -224,6 +224,19 @@ async function main() {
     });
   }
 
+  const aircraftTypes = [
+    ['B757_300_75Y', 'Boeing 757-300 (75Y)'],
+    ['B737_800', 'Boeing 737-800'],
+    ['A320', 'Airbus A320'],
+  ] as const;
+  for (const [index, [code, name]] of aircraftTypes.entries()) {
+    await prisma.aircraftType.upsert({
+      where: { code },
+      update: { name, sortOrder: index + 1, isActive: true },
+      create: { code, name, sortOrder: index + 1, isActive: true },
+    });
+  }
+
   const cabinChecklist = [
     'First Class',
     'Front Galley',

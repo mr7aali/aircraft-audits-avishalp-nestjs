@@ -24,6 +24,7 @@ import { EmployeeOneOnOnesModule } from './modules/employee-one-on-ones/employee
 import { FeedbackModule } from './modules/feedback/feedback.module.js';
 import { ChatModule } from './modules/chat/chat.module.js';
 import { CommonModule } from './common/common.module.js';
+import { AdminDashboardModule } from './modules/admin-dashboard/admin-dashboard.module.js';
 
 @Module({
   imports: [
@@ -122,6 +123,7 @@ import { CommonModule } from './common/common.module.js';
     EmployeeOneOnOnesModule,
     FeedbackModule,
     ChatModule,
+    AdminDashboardModule,
   ],
   providers: [
     {

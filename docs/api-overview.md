@@ -19,10 +19,24 @@ Base URL prefix: `/api`
 
 ## Master Data
 - `GET /master-data/clean-types`
+- `POST /master-data/clean-types`
+- `PATCH /master-data/clean-types/:id`
+- `GET /master-data/aircraft-types`
+- `POST /master-data/aircraft-types`
+- `PATCH /master-data/aircraft-types/:id`
 - `GET /master-data/cabin-quality-checklist-items`
 - `GET /master-data/lav-safety-checklist-items`
 - `GET /master-data/security-search-areas`
 - `GET /master-data/gates?stationId=...`
+- `POST /master-data/gates`
+- `PATCH /master-data/gates/:id`
+- `GET /master-data/stations`
+- `POST /master-data/stations`
+- `PATCH /master-data/stations/:id`
+
+## Admin Dashboard
+- `GET /admin-dashboard/overview`
+- `GET /admin-dashboard/audit-records`
 
 ## Files
 - `POST /files/upload` (`multipart/form-data`)
