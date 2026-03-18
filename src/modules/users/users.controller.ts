@@ -20,4 +20,13 @@ export class UsersController {
       user.activeStationId ?? undefined,
     );
   }
+
+  @Get('chat-users')
+  @ApiQuery({ name: 'q', required: false })
+  listChatUsers(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('q') q?: string,
+  ) {
+    return this.usersService.listChatUsers(user.id, q);
+  }
 }

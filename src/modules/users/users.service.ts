@@ -182,4 +182,45 @@ export class UsersService {
       email: user.email,
     }));
   }
+
+  async listChatUsers(currentUserId: string, query?: string) {
+    const trimmed = query?.trim() ?? '';
+
+    const users = await this.prisma.user.findMany({
+      where: {
+        status: 'ACTIVE',
+        NOT: { id: currentUserId },
+        ...(trimmed.length === 0
+          ? {}
+          : {
+              OR: [
+                { firstName: { contains: trimmed, mode: 'insensitive' } },
+                { lastName: { contains: trimmed, mode: 'insensitive' } },
+                { uid: { contains: trimmed, mode: 'insensitive' } },
+                { email: { contains: trimmed, mode: 'insensitive' } },
+              ],
+            }),
+      },
+      select: {
+        id: true,
+        uid: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        profileImageFileId: true,
+        lastSeenAt: true,
+      },
+      take: 200,
+      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+    });
+
+    return users.map((user) => ({
+      id: user.id,
+      uid: user.uid,
+      email: user.email,
+      name: `${user.firstName} ${user.lastName}`.trim(),
+      profileImageFileId: user.profileImageFileId,
+      lastSeenAt: user.lastSeenAt,
+    }));
+  }
 }
