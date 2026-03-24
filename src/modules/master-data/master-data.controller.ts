@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { MODULE_CODES } from '../../common/constants/module-codes.js';
 import { RequireActiveStation } from '../../common/decorators/require-active-station.decorator.js';
@@ -9,6 +18,7 @@ import {
   CreateGateDto,
   CreateStationDto,
   MasterDataListQueryDto,
+  UpdateAircraftSeatMapDto,
   UpdateAircraftTypeDto,
   UpdateCleanTypeDto,
   UpdateGateDto,
@@ -41,6 +51,12 @@ export class MasterDataController {
     return this.masterDataService.updateCleanType(id, dto);
   }
 
+  @Delete('clean-types/:id')
+  @RequirePermission(MODULE_CODES.MASTER_DATA, 'create')
+  deleteCleanType(@Param('id') id: string) {
+    return this.masterDataService.deleteCleanType(id);
+  }
+
   @Get('aircraft-types')
   @RequirePermission(MODULE_CODES.MASTER_DATA, 'list')
   getAircraftTypes(@Query() query: MasterDataListQueryDto) {
@@ -60,6 +76,21 @@ export class MasterDataController {
     @Body() dto: UpdateAircraftTypeDto,
   ) {
     return this.masterDataService.updateAircraftType(id, dto);
+  }
+
+  @Delete('aircraft-types/:id')
+  @RequirePermission(MODULE_CODES.MASTER_DATA, 'create')
+  deleteAircraftType(@Param('id') id: string) {
+    return this.masterDataService.deleteAircraftType(id);
+  }
+
+  @Patch('aircraft-types/:id/seat-map')
+  @RequirePermission(MODULE_CODES.MASTER_DATA, 'create')
+  updateAircraftSeatMap(
+    @Param('id') id: string,
+    @Body() dto: UpdateAircraftSeatMapDto,
+  ) {
+    return this.masterDataService.updateAircraftSeatMap(id, dto);
   }
 
   @Get('cabin-quality-checklist-items')
@@ -98,6 +129,12 @@ export class MasterDataController {
     return this.masterDataService.updateStation(id, dto);
   }
 
+  @Delete('stations/:id')
+  @RequirePermission(MODULE_CODES.MASTER_DATA, 'create')
+  deleteStation(@Param('id') id: string) {
+    return this.masterDataService.deleteStation(id);
+  }
+
   @Get('gates')
   @RequirePermission(MODULE_CODES.MASTER_DATA, 'list')
   @ApiQuery({ name: 'stationId', required: true })
@@ -118,5 +155,11 @@ export class MasterDataController {
   @RequirePermission(MODULE_CODES.MASTER_DATA, 'create')
   updateGate(@Param('id') id: string, @Body() dto: UpdateGateDto) {
     return this.masterDataService.updateGate(id, dto);
+  }
+
+  @Delete('gates/:id')
+  @RequirePermission(MODULE_CODES.MASTER_DATA, 'create')
+  deleteGate(@Param('id') id: string) {
+    return this.masterDataService.deleteGate(id);
   }
 }

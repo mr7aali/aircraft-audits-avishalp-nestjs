@@ -195,6 +195,7 @@ model AircraftType {
   name      String
   sortOrder Int      @default(0)
   isActive  Boolean  @default(true)
+  seatMapJson Json?
   createdAt DateTime @db.Timestamptz(3) @default(now())
   updatedAt DateTime @db.Timestamptz(3) @updatedAt
 

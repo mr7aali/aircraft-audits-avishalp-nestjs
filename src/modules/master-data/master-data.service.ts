@@ -1,10 +1,18 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { Prisma } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import {
   CreateAircraftTypeDto,
+  AircraftSeatMapDto,
   CreateCleanTypeDto,
   CreateGateDto,
   CreateStationDto,
+  UpdateAircraftSeatMapDto,
   UpdateAircraftTypeDto,
   UpdateCleanTypeDto,
   UpdateGateDto,
@@ -46,35 +54,75 @@ export class MasterDataService {
     });
   }
 
+  async deleteCleanType(id: string) {
+    await this.ensureExists('cleanType', id, 'Clean type');
+    return this.deleteWithReferenceGuard('Clean type', () =>
+      this.prisma.cleanType.delete({
+        where: { id },
+      }),
+    );
+  }
+
   getAircraftTypes(includeInactive = false) {
-    return this.prisma.aircraftType.findMany({
+    return this.prisma.aircraftType
+      .findMany({
       where: includeInactive ? undefined : { isActive: true },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-    });
+      })
+      .then((records) => records.map((record) => this.mapAircraftTypeRecord(record)));
   }
 
   createAircraftType(dto: CreateAircraftTypeDto) {
-    return this.prisma.aircraftType.create({
-      data: {
-        code: dto.code.trim().toUpperCase(),
-        name: dto.name.trim(),
-        sortOrder: dto.sortOrder ?? 0,
-        isActive: dto.isActive ?? true,
-      },
-    });
+    return this.prisma.aircraftType
+      .create({
+        data: {
+          code: dto.code.trim().toUpperCase(),
+          name: dto.name.trim(),
+          sortOrder: dto.sortOrder ?? 0,
+          isActive: dto.isActive ?? true,
+        },
+      })
+      .then((record) => this.mapAircraftTypeRecord(record));
   }
 
   async updateAircraftType(id: string, dto: UpdateAircraftTypeDto) {
     await this.ensureExists('aircraftType', id, 'Aircraft type');
-    return this.prisma.aircraftType.update({
-      where: { id },
-      data: {
-        ...(dto.code != null ? { code: dto.code.trim().toUpperCase() } : {}),
-        ...(dto.name != null ? { name: dto.name.trim() } : {}),
-        ...(dto.sortOrder != null ? { sortOrder: dto.sortOrder } : {}),
-        ...(dto.isActive != null ? { isActive: dto.isActive } : {}),
-      },
-    });
+    return this.prisma.aircraftType
+      .update({
+        where: { id },
+        data: {
+          ...(dto.code != null ? { code: dto.code.trim().toUpperCase() } : {}),
+          ...(dto.name != null ? { name: dto.name.trim() } : {}),
+          ...(dto.sortOrder != null ? { sortOrder: dto.sortOrder } : {}),
+          ...(dto.isActive != null ? { isActive: dto.isActive } : {}),
+        },
+      })
+      .then((record) => this.mapAircraftTypeRecord(record));
+  }
+
+  async deleteAircraftType(id: string) {
+    await this.ensureExists('aircraftType', id, 'Aircraft type');
+    return this.deleteWithReferenceGuard('Aircraft type', () =>
+      this.prisma.aircraftType
+        .delete({
+          where: { id },
+        })
+        .then((record) => this.mapAircraftTypeRecord(record)),
+    );
+  }
+
+  async updateAircraftSeatMap(id: string, dto: UpdateAircraftSeatMapDto) {
+    await this.ensureExists('aircraftType', id, 'Aircraft type');
+    this.validateAircraftSeatMap(dto.seatMap);
+
+    return this.prisma.aircraftType
+      .update({
+        where: { id },
+        data: {
+          seatMapJson: this.normalizeAircraftSeatMap(dto.seatMap),
+        },
+      })
+      .then((record) => this.mapAircraftTypeRecord(record));
   }
 
   getCabinQualityChecklistItems() {
@@ -133,6 +181,15 @@ export class MasterDataService {
     });
   }
 
+  async deleteStation(id: string) {
+    await this.ensureExists('station', id, 'Station');
+    return this.deleteWithReferenceGuard('Station', () =>
+      this.prisma.station.delete({
+        where: { id },
+      }),
+    );
+  }
+
   getGates(stationId: string, includeInactive = false) {
     if (!stationId.trim()) {
       throw new BadRequestException('stationId is required');
@@ -187,6 +244,15 @@ export class MasterDataService {
     });
   }
 
+  async deleteGate(id: string) {
+    await this.ensureExists('gate', id, 'Gate');
+    return this.deleteWithReferenceGuard('Gate', () =>
+      this.prisma.gate.delete({
+        where: { id },
+      }),
+    );
+  }
+
   private async ensureExists(
     model: 'cleanType' | 'aircraftType' | 'station' | 'gate',
     id: string,
@@ -224,5 +290,169 @@ export class MasterDataService {
     if (!entity) {
       throw new NotFoundException(`${label} not found`);
     }
+  }
+
+  private async deleteWithReferenceGuard<T>(
+    label: string,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        (error.code === 'P2003' || error.code === 'P2014')
+      ) {
+        throw new ConflictException(
+          `${label} cannot be deleted because it is currently in use.`,
+        );
+      }
+
+      throw error;
+    }
+  }
+
+  private mapAircraftTypeRecord<
+    T extends {
+      seatMapJson?: Prisma.JsonValue | null;
+    },
+  >(record: T) {
+    const { seatMapJson, ...rest } = record;
+    return {
+      ...rest,
+      seatMap: seatMapJson ?? null,
+    };
+  }
+
+  private validateAircraftSeatMap(seatMap: AircraftSeatMapDto) {
+    seatMap.sections.forEach((section, sectionIndex) => {
+      if (section.endRow < section.startRow) {
+        throw new BadRequestException(
+          `Section ${sectionIndex + 1} must end after it starts`,
+        );
+      }
+
+      this.validateAircraftSeatMapAmenities(
+        section.amenitiesBefore,
+        `Section ${sectionIndex + 1} pre-row amenities`,
+      );
+      this.validateAircraftSeatMapAmenities(
+        section.amenitiesAfter,
+        `Section ${sectionIndex + 1} post-row amenities`,
+      );
+    });
+  }
+
+  private validateAircraftSeatMapAmenities(
+    amenities:
+      | {
+          leftSvg?: string;
+          leftId?: string;
+          rightSvg?: string;
+          rightId?: string;
+          customLabel?: string;
+          centerOnly?: boolean;
+        }[]
+      | undefined,
+    label: string,
+  ) {
+    if (!amenities?.length) {
+      return;
+    }
+
+    amenities.forEach((amenity, amenityIndex) => {
+      const hasLeftSvg = amenity.leftSvg?.trim().length;
+      const hasLeftId = amenity.leftId?.trim().length;
+      const hasRightSvg = amenity.rightSvg?.trim().length;
+      const hasRightId = amenity.rightId?.trim().length;
+      const hasCustomLabel = amenity.customLabel?.trim().length;
+
+      if (Boolean(hasLeftSvg) !== Boolean(hasLeftId)) {
+        throw new BadRequestException(
+          `${label} row ${amenityIndex + 1} must include both left icon and left id`,
+        );
+      }
+
+      if (Boolean(hasRightSvg) !== Boolean(hasRightId)) {
+        throw new BadRequestException(
+          `${label} row ${amenityIndex + 1} must include both right icon and right id`,
+        );
+      }
+
+      if (!hasLeftSvg && !hasRightSvg && !hasCustomLabel) {
+        throw new BadRequestException(
+          `${label} row ${amenityIndex + 1} must define at least one amenity or custom label`,
+        );
+      }
+    });
+  }
+
+  private normalizeAircraftSeatMap(
+    seatMap: AircraftSeatMapDto,
+  ): Prisma.InputJsonValue {
+    return {
+      hasFirstClassArc: seatMap.hasFirstClassArc ?? false,
+      sections: seatMap.sections.map((section) => ({
+        name: section.name.trim(),
+        startRow: section.startRow,
+        endRow: section.endRow,
+        leftCols: section.leftCols
+          .map((column) => column.trim().toUpperCase())
+          .filter((column) => column.length > 0),
+        rightCols: section.rightCols
+          .map((column) => column.trim().toUpperCase())
+          .filter((column) => column.length > 0),
+        areaType: section.areaType ?? 'main_cabin',
+        hasExitBefore: section.hasExitBefore ?? false,
+        hasExitAfter: section.hasExitAfter ?? false,
+        ...(section.amenitiesBefore?.length
+          ? {
+              amenitiesBefore: section.amenitiesBefore.map((amenity) =>
+                this.normalizeAircraftSeatMapAmenity(amenity),
+              ),
+            }
+          : {}),
+        ...(section.amenitiesAfter?.length
+          ? {
+              amenitiesAfter: section.amenitiesAfter.map((amenity) =>
+                this.normalizeAircraftSeatMapAmenity(amenity),
+              ),
+            }
+          : {}),
+        ...(section.skipRows?.length
+          ? {
+              skipRows: [...new Set(section.skipRows)].sort((a, b) => a - b),
+            }
+          : {}),
+      })),
+    };
+  }
+
+  private normalizeAircraftSeatMapAmenity(amenity: {
+    leftSvg?: string;
+    leftId?: string;
+    rightSvg?: string;
+    rightId?: string;
+    customLabel?: string;
+    centerOnly?: boolean;
+  }) {
+    return {
+      ...(amenity.leftSvg?.trim() && amenity.leftId?.trim()
+        ? {
+            leftSvg: amenity.leftSvg.trim(),
+            leftId: amenity.leftId.trim(),
+          }
+        : {}),
+      ...(amenity.rightSvg?.trim() && amenity.rightId?.trim()
+        ? {
+            rightSvg: amenity.rightSvg.trim(),
+            rightId: amenity.rightId.trim(),
+          }
+        : {}),
+      ...(amenity.customLabel?.trim()
+        ? { customLabel: amenity.customLabel.trim() }
+        : {}),
+      ...(amenity.centerOnly ? { centerOnly: true } : {}),
+    };
   }
 }
