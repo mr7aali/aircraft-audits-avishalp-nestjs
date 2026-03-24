@@ -1,6 +1,7 @@
-import { PrismaClient } from '../src/generated/prisma/client.js';
+import { Prisma, PrismaClient } from '../src/generated/prisma/client.js';
 import * as argon2 from 'argon2';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { DEFAULT_AIRCRAFT_SEAT_MAPS } from '../src/modules/master-data/aircraft-seat-map.defaults.js';
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -228,12 +229,29 @@ async function main() {
     ['B757_300_75Y', 'Boeing 757-300 (75Y)'],
     ['B737_800', 'Boeing 737-800'],
     ['A320', 'Airbus A320'],
+    ['A321_200', 'Airbus A321-200'],
+    ['A319', 'Airbus A319'],
+    ['A220_300', 'Airbus A220-300'],
+    ['B737_900ER', 'Boeing 737-900ER'],
   ] as const;
   for (const [index, [code, name]] of aircraftTypes.entries()) {
     await prisma.aircraftType.upsert({
       where: { code },
-      update: { name, sortOrder: index + 1, isActive: true },
-      create: { code, name, sortOrder: index + 1, isActive: true },
+      update: {
+        name,
+        sortOrder: index + 1,
+        isActive: true,
+        seatMapJson:
+          DEFAULT_AIRCRAFT_SEAT_MAPS[code] as unknown as Prisma.InputJsonValue,
+      },
+      create: {
+        code,
+        name,
+        sortOrder: index + 1,
+        isActive: true,
+        seatMapJson:
+          DEFAULT_AIRCRAFT_SEAT_MAPS[code] as unknown as Prisma.InputJsonValue,
+      },
     });
   }
 
