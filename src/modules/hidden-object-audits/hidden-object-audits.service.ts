@@ -246,6 +246,32 @@ export class HiddenObjectAuditsService {
       );
     }
 
+    const existingOpenSession = await this.prisma.hiddenObjectAuditSession.findFirst(
+      {
+        where: {
+          stationId,
+          shipNumberSnapshot: fleetAircraft.shipNumber,
+          status: {
+            in: [
+              HiddenObjectAuditStatus.SETUP,
+              HiddenObjectAuditStatus.ACTIVE,
+            ],
+          },
+        },
+        select: {
+          status: true,
+        },
+      },
+    );
+
+    if (existingOpenSession) {
+      throw new BadRequestException(
+        existingOpenSession.status === HiddenObjectAuditStatus.ACTIVE
+          ? 'An active hidden object audit already exists for this ship number'
+          : 'A setup hidden object audit already exists for this ship number',
+      );
+    }
+
     const candidates = this.extractLocationCandidates(aircraftType.seatMapJson);
     if (dto.numberOfObjectsToHide > candidates.length) {
       throw new BadRequestException(
@@ -253,10 +279,19 @@ export class HiddenObjectAuditsService {
       );
     }
 
-    const selectedLocations = this.pickRandomCandidates(
-      candidates,
-      dto.numberOfObjectsToHide,
-    );
+    const manuallySelectedCodes = (dto.selectedLocationCodes ?? [])
+      .map((value) => value.trim().toUpperCase())
+      .filter((value) => value.length > 0);
+
+    const selectedLocations = manuallySelectedCodes.length
+      ? this.selectRequestedCandidates(candidates, manuallySelectedCodes)
+      : this.pickRandomCandidates(candidates, dto.numberOfObjectsToHide);
+
+    if (!selectedLocations.length) {
+      throw new BadRequestException(
+        'Select at least one seat or zone before creating the audit',
+      );
+    }
 
     const created = await this.prisma.$transaction(async (tx) => {
       const session = await tx.hiddenObjectAuditSession.create({
@@ -270,7 +305,7 @@ export class HiddenObjectAuditsService {
           aircraftTypeNameSnapshot: aircraftType.name,
           fleetAircraftId: fleetAircraft.id,
           shipNumberSnapshot: fleetAircraft.shipNumber,
-          objectsToHideCount: dto.numberOfObjectsToHide,
+          objectsToHideCount: selectedLocations.length,
           status: HiddenObjectAuditStatus.SETUP,
         },
       });
@@ -391,6 +426,26 @@ export class HiddenObjectAuditsService {
       ) {
         throw new BadRequestException(
           'Every designated location must be confirmed with a photo before activation',
+        );
+      }
+
+      const existingActiveSession = await tx.hiddenObjectAuditSession.findFirst({
+        where: {
+          stationId,
+          shipNumberSnapshot: session.shipNumberSnapshot,
+          status: HiddenObjectAuditStatus.ACTIVE,
+          NOT: {
+            id: session.id,
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (existingActiveSession) {
+        throw new BadRequestException(
+          'Another active hidden object audit already exists for this ship number',
         );
       }
 
@@ -637,6 +692,31 @@ export class HiddenObjectAuditsService {
       ];
     }
     return shuffled.slice(0, count);
+  }
+
+  private selectRequestedCandidates(
+    candidates: LocationCandidate[],
+    selectedLocationCodes: string[],
+  ) {
+    const candidateMap = new Map(
+      candidates.map((candidate) => [
+        candidate.locationCode.trim().toUpperCase(),
+        candidate,
+      ]),
+    );
+    const selectedCandidates: LocationCandidate[] = [];
+
+    for (const locationCode of selectedLocationCodes) {
+      const candidate = candidateMap.get(locationCode);
+      if (!candidate) {
+        throw new BadRequestException(
+          `Selected location ${locationCode} is not available for this aircraft type`,
+        );
+      }
+      selectedCandidates.push(candidate);
+    }
+
+    return selectedCandidates;
   }
 
   private extractLocationCandidates(seatMapJson: Prisma.JsonValue | null) {

@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMinSize,
+  ArrayUnique,
   IsArray,
   IsInt,
   IsOptional,
@@ -26,6 +27,14 @@ export class CreateHiddenObjectAuditDto {
   @IsInt()
   @Min(1)
   numberOfObjectsToHide!: number;
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsString({ each: true })
+  @MaxLength(60, { each: true })
+  selectedLocationCodes?: string[];
 
   @ApiPropertyOptional()
   @IsOptional()

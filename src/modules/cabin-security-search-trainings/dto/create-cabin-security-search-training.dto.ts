@@ -3,6 +3,7 @@ import { PassFail } from '../../../generated/prisma-client/enums.js';
 import {
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsEnum,
   IsOptional,
   IsString,
@@ -86,6 +87,16 @@ export class SecurityTrainingDetailedAreaDto {
   checkItems!: SecurityTrainingDetailedCheckItemDto[];
 }
 
+export class HiddenObjectLocationSearchResultDto {
+  @ApiProperty()
+  @IsUUID()
+  locationId!: string;
+
+  @ApiProperty()
+  @IsBoolean()
+  found!: boolean;
+}
+
 export class CreateCabinSecuritySearchTrainingDto {
   @ApiProperty()
   @IsString()
@@ -117,6 +128,18 @@ export class CreateCabinSecuritySearchTrainingDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @IsUUID()
+  hiddenObjectAuditId?: string;
+
+  @ApiPropertyOptional({ type: [HiddenObjectLocationSearchResultDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => HiddenObjectLocationSearchResultDto)
+  hiddenObjectLocationResults?: HiddenObjectLocationSearchResultDto[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsString()
   @MaxLength(3000)
   otherFindings?: string;
@@ -133,4 +156,3 @@ export class CreateCabinSecuritySearchTrainingDto {
   @IsUUID('4', { each: true })
   generalPictureFileIds?: string[];
 }
-

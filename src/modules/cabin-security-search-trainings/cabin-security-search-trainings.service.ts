@@ -5,7 +5,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '../../generated/prisma-client/client.js';
-import { PassFail } from '../../generated/prisma-client/enums.js';
+import {
+  HiddenObjectAuditStatus,
+  HiddenObjectLocationStatus,
+  PassFail,
+} from '../../generated/prisma-client/enums.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuthenticatedUser } from '../../common/types/authenticated-user.type.js';
 import { buildPaginatedResult } from '../../common/utils/pagination.util.js';
@@ -42,13 +46,15 @@ export class CabinSecuritySearchTrainingsService {
       throw new ForbiddenException('Active station is required');
     }
 
+    const normalizedShipNumber = this.normalizeShipNumber(dto.shipNumber);
+
     const resolvedShiftOccurrenceId =
       dto.shiftOccurrenceId ??
       (await this.shiftContextService.resolveCurrentShiftOccurrenceId(
         user.activeStationId,
       ));
 
-    const [stationAccess, gate, areas] = await Promise.all([
+    const [stationAccess, gate, areas, hiddenObjectAudit] = await Promise.all([
       this.prisma.userStationAccess.findUnique({
         where: {
           userId_stationId: {
@@ -62,6 +68,19 @@ export class CabinSecuritySearchTrainingsService {
       this.prisma.securitySearchArea.findMany({
         where: { isActive: true },
       }),
+      dto.hiddenObjectAuditId
+        ? this.prisma.hiddenObjectAuditSession.findFirst({
+            where: {
+              id: dto.hiddenObjectAuditId,
+              stationId: user.activeStationId,
+            },
+            select: {
+              id: true,
+              status: true,
+              shipNumberSnapshot: true,
+            },
+          })
+        : Promise.resolve(null),
     ]);
 
     if (!stationAccess || !stationAccess.isActive) {
@@ -69,6 +88,23 @@ export class CabinSecuritySearchTrainingsService {
     }
     if (!gate || gate.stationId !== user.activeStationId) {
       throw new BadRequestException('Invalid gate for active station');
+    }
+    if (hiddenObjectAudit) {
+      if (hiddenObjectAudit.status !== HiddenObjectAuditStatus.ACTIVE) {
+        throw new BadRequestException(
+          'The linked hidden object audit is not active',
+        );
+      }
+      if (
+        this.normalizeShipNumber(hiddenObjectAudit.shipNumberSnapshot) !==
+        normalizedShipNumber
+      ) {
+        throw new BadRequestException(
+          'The linked hidden object audit does not match the selected ship number',
+        );
+      }
+    } else if (dto.hiddenObjectAuditId) {
+      throw new BadRequestException('Linked hidden object audit was not found');
     }
     const uniqueAreaKeys = new Set(
       dto.areaResults.map((item) =>
@@ -110,6 +146,7 @@ export class CabinSecuritySearchTrainingsService {
         areas.map((area) => [area.label.trim().toLowerCase(), area]),
       );
       const resolvedAreaEntries: ResolvedAreaEntry[] = [];
+      const now = new Date();
 
       for (const result of dto.areaResults) {
         const area = await this.resolveAreaForResult(
@@ -168,6 +205,102 @@ export class CabinSecuritySearchTrainingsService {
             fileId,
             sortOrder: index,
           })),
+        });
+      }
+
+      if (hiddenObjectAudit) {
+        const activeLocations = await tx.hiddenObjectAuditLocation.findMany({
+          where: {
+            sessionId: hiddenObjectAudit.id,
+            status: HiddenObjectLocationStatus.BLUE,
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        const locationIds = activeLocations.map((location) => location.id);
+        const uniqueLocationIds = new Set(
+          (dto.hiddenObjectLocationResults ?? []).map(
+            (entry) => entry.locationId,
+          ),
+        );
+
+        if (!locationIds.length) {
+          throw new BadRequestException(
+            'The linked hidden object audit does not have any active locations to search',
+          );
+        }
+        if (!uniqueLocationIds.size) {
+          throw new BadRequestException(
+            'Hidden object search results are required for the linked audit',
+          );
+        }
+        if (
+          uniqueLocationIds.size !==
+          (dto.hiddenObjectLocationResults ?? []).length
+        ) {
+          throw new BadRequestException(
+            'Duplicate hidden object search results are not allowed',
+          );
+        }
+        if (uniqueLocationIds.size !== locationIds.length) {
+          throw new BadRequestException(
+            'Every active hidden object location must be included in the cabin security search results',
+          );
+        }
+
+        const missingLocationId = Array.from(uniqueLocationIds).find(
+          (locationId) => !locationIds.includes(locationId),
+        );
+        if (missingLocationId) {
+          throw new BadRequestException(
+            'One or more hidden object locations do not belong to the linked audit',
+          );
+        }
+
+        const foundLocationIds = (dto.hiddenObjectLocationResults ?? [])
+          .filter((entry) => entry.found)
+          .map((entry) => entry.locationId);
+
+        if (foundLocationIds.length) {
+          const updated = await tx.hiddenObjectAuditLocation.updateMany({
+            where: {
+              sessionId: hiddenObjectAudit.id,
+              id: { in: foundLocationIds },
+              status: HiddenObjectLocationStatus.BLUE,
+            },
+            data: {
+              status: HiddenObjectLocationStatus.GREEN,
+              foundAt: now,
+              foundByUserId: user.id,
+              foundByNameSnapshot: `${stationAccess.user.firstName} ${stationAccess.user.lastName}`,
+            },
+          });
+
+          if (updated.count !== foundLocationIds.length) {
+            throw new BadRequestException(
+              'Unable to update all linked hidden object locations as found',
+            );
+          }
+        }
+
+        await tx.hiddenObjectAuditLocation.updateMany({
+          where: {
+            sessionId: hiddenObjectAudit.id,
+            status: HiddenObjectLocationStatus.BLUE,
+          },
+          data: {
+            status: HiddenObjectLocationStatus.RED,
+          },
+        });
+
+        await tx.hiddenObjectAuditSession.update({
+          where: { id: hiddenObjectAudit.id },
+          data: {
+            status: HiddenObjectAuditStatus.CLOSED,
+            closedAt: now,
+          },
         });
       }
 
@@ -328,5 +461,8 @@ export class CabinSecuritySearchTrainingsService {
 
     return `${baseCode || 'AREA'}_${randomUUID().slice(0, 8).toUpperCase()}`;
   }
-}
 
+  private normalizeShipNumber(value: string): string {
+    return value.trim().toUpperCase();
+  }
+}
