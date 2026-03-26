@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { ScanStatus } from '../../../generated/prisma/enums.js';
+import { ScanStatus } from '../../../generated/prisma-client/enums.js';
 
 @Injectable()
 export class FileScanService {
@@ -8,3 +8,4 @@ export class FileScanService {
     return Promise.resolve(ScanStatus.CLEAN);
   }
 }
+

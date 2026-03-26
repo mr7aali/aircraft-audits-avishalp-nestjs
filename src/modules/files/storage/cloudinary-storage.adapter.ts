@@ -2,7 +2,7 @@ import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { extname } from 'path';
 import { v2 as cloudinary, type UploadApiResponse } from 'cloudinary';
-import type { File as StoredFileRecord } from '../../../generated/prisma/client.js';
+import type { File as StoredFileRecord } from '../../../generated/prisma-client/client.js';
 import { StorageAdapter, StoredFileResult } from './storage.adapter.js';
 
 type CloudinaryMetadata = {
@@ -181,3 +181,4 @@ export class CloudinaryStorageAdapter implements StorageAdapter {
     return 'bin';
   }
 }
+

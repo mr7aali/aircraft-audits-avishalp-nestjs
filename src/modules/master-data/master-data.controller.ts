@@ -15,12 +15,14 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import {
   CreateAircraftTypeDto,
   CreateCleanTypeDto,
+  CreateFleetAircraftDto,
   CreateGateDto,
   CreateStationDto,
   MasterDataListQueryDto,
   UpdateAircraftSeatMapDto,
   UpdateAircraftTypeDto,
   UpdateCleanTypeDto,
+  UpdateFleetAircraftDto,
   UpdateGateDto,
   UpdateStationDto,
 } from './dto/manage-master-data.dto.js';
@@ -63,6 +65,12 @@ export class MasterDataController {
     return this.masterDataService.getAircraftTypes(query.includeInactive);
   }
 
+  @Get('fleet-aircraft')
+  @RequirePermission(MODULE_CODES.MASTER_DATA, 'list')
+  getFleetAircraft(@Query() query: MasterDataListQueryDto) {
+    return this.masterDataService.getFleetAircraft(query.includeInactive);
+  }
+
   @Post('aircraft-types')
   @RequirePermission(MODULE_CODES.MASTER_DATA, 'create')
   createAircraftType(@Body() dto: CreateAircraftTypeDto) {
@@ -82,6 +90,27 @@ export class MasterDataController {
   @RequirePermission(MODULE_CODES.MASTER_DATA, 'create')
   deleteAircraftType(@Param('id') id: string) {
     return this.masterDataService.deleteAircraftType(id);
+  }
+
+  @Post('fleet-aircraft')
+  @RequirePermission(MODULE_CODES.MASTER_DATA, 'create')
+  createFleetAircraft(@Body() dto: CreateFleetAircraftDto) {
+    return this.masterDataService.createFleetAircraft(dto);
+  }
+
+  @Patch('fleet-aircraft/:id')
+  @RequirePermission(MODULE_CODES.MASTER_DATA, 'create')
+  updateFleetAircraft(
+    @Param('id') id: string,
+    @Body() dto: UpdateFleetAircraftDto,
+  ) {
+    return this.masterDataService.updateFleetAircraft(id, dto);
+  }
+
+  @Delete('fleet-aircraft/:id')
+  @RequirePermission(MODULE_CODES.MASTER_DATA, 'create')
+  deleteFleetAircraft(@Param('id') id: string) {
+    return this.masterDataService.deleteFleetAircraft(id);
   }
 
   @Patch('aircraft-types/:id/seat-map')

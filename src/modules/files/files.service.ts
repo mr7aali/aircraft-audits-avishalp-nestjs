@@ -6,7 +6,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { extname } from 'path';
 import { randomUUID } from 'crypto';
-import { Prisma } from '../../generated/prisma/client.js';
+import { Prisma } from '../../generated/prisma-client/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuthenticatedUser } from '../../common/types/authenticated-user.type.js';
 import { UploadFileDto } from './dto/upload-file.dto.js';
@@ -14,7 +14,7 @@ import { FileScanService } from './scanner/file-scan.service.js';
 import { CloudinaryStorageAdapter } from './storage/cloudinary-storage.adapter.js';
 import { LocalStorageAdapter } from './storage/local-storage.adapter.js';
 import { S3StorageAdapter } from './storage/s3-storage.adapter.js';
-import { FileCategory } from '../../generated/prisma/enums.js';
+import { FileCategory } from '../../generated/prisma-client/enums.js';
 
 @Injectable()
 export class FilesService {
@@ -156,3 +156,4 @@ export class FilesService {
     return FileCategory.DOCUMENT;
   }
 }
+

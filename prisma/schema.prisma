@@ -1,6 +1,6 @@
 generator client {
   provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  output   = "../src/generated/prisma-client"
 }
 
 datasource db {
@@ -12,8 +12,8 @@ model Role {
   code            String              @unique
   name            String
   isActive        Boolean             @default(true)
-  createdAt       DateTime @db.Timestamptz(3)            @default(now())
-  updatedAt       DateTime @db.Timestamptz(3)            @updatedAt
+  createdAt       DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime            @updatedAt @db.Timestamptz(3)
   moduleAccesses  RoleModuleAccess[]
   stationAccesses UserStationAccess[]
 
@@ -21,40 +21,42 @@ model Role {
 }
 
 model User {
-  id                           String                        @id @default(uuid()) @db.Uuid
-  uid                          String                        @unique
-  email                        String                        @unique
-  passwordHash                 String
-  firstName                    String
-  lastName                     String
-  phone                        String?
-  profileImageFileId           String?                       @db.Uuid
-  publishedAt                  DateTime? @db.Timestamptz(3)
-  status                       UserStatus                    @default(ACTIVE)
-  failedLoginCount             Int                           @default(0)
-  lockedUntil                  DateTime? @db.Timestamptz(3)
-  lastSeenAt                   DateTime? @db.Timestamptz(3)
-  createdAt                    DateTime @db.Timestamptz(3)                      @default(now())
-  updatedAt                    DateTime @db.Timestamptz(3)                      @updatedAt
-  accountRecoveryRequests      AccountRecoveryRequest[]
-  feedbacks                    AppFeedback[]
-  authSessions                 AuthSession[]
-  cabinQualityAudits           CabinQualityAudit[]
-  cabinSecuritySearchTrainings CabinSecuritySearchTraining[]
-  chatParticipants             ChatConversationParticipant[]
-  createdChatConversations     ChatConversation[]            @relation("ChatConversationCreatedBy")
-  chatReceipts                 ChatMessageReceipt[]          @relation("ChatMessageRecipient")
-  sentChatMessages             ChatMessage[]                 @relation("ChatMessageSender")
-  chatPollVotes                ChatPollVote[]
-  emailNotifications           EmailNotification[]
-  attendedOneOnOnes            EmployeeOneOnOne[]            @relation("EmployeeOneOnOnes")
-  ledOneOnOnes                 EmployeeOneOnOne[]            @relation("LeaderOneOnOnes")
-  endOfShiftReports            EndOfShiftReport[]
-  uploadedFiles                File[]                        @relation("UserUploadedFiles")
-  lavSafetyObservations        LavSafetyObservation[]
-  loginAuditLogs               LoginAuditLog[]
-  stationAccesses              UserStationAccess[]
-  profileImageFile             File?                         @relation("UserProfileImage", fields: [profileImageFileId], references: [id])
+  id                             String                        @id @default(uuid()) @db.Uuid
+  uid                            String                        @unique
+  email                          String                        @unique
+  passwordHash                   String
+  firstName                      String
+  lastName                       String
+  phone                          String?
+  profileImageFileId             String?                       @db.Uuid
+  publishedAt                    DateTime?                     @db.Timestamptz(3)
+  status                         UserStatus                    @default(ACTIVE)
+  failedLoginCount               Int                           @default(0)
+  lockedUntil                    DateTime?                     @db.Timestamptz(3)
+  lastSeenAt                     DateTime?                     @db.Timestamptz(3)
+  createdAt                      DateTime                      @default(now()) @db.Timestamptz(3)
+  updatedAt                      DateTime                      @updatedAt @db.Timestamptz(3)
+  accountRecoveryRequests        AccountRecoveryRequest[]
+  feedbacks                      AppFeedback[]
+  authSessions                   AuthSession[]
+  cabinQualityAudits             CabinQualityAudit[]
+  cabinSecuritySearchTrainings   CabinSecuritySearchTraining[]
+  hiddenObjectAuditSessions      HiddenObjectAuditSession[]    @relation("HiddenObjectAuditAuditor")
+  hiddenObjectAuditLocationFinds HiddenObjectAuditLocation[]   @relation("HiddenObjectAuditLocationFoundBy")
+  chatParticipants               ChatConversationParticipant[]
+  createdChatConversations       ChatConversation[]            @relation("ChatConversationCreatedBy")
+  chatReceipts                   ChatMessageReceipt[]          @relation("ChatMessageRecipient")
+  sentChatMessages               ChatMessage[]                 @relation("ChatMessageSender")
+  chatPollVotes                  ChatPollVote[]
+  emailNotifications             EmailNotification[]
+  attendedOneOnOnes              EmployeeOneOnOne[]            @relation("EmployeeOneOnOnes")
+  ledOneOnOnes                   EmployeeOneOnOne[]            @relation("LeaderOneOnOnes")
+  endOfShiftReports              EndOfShiftReport[]
+  uploadedFiles                  File[]                        @relation("UserUploadedFiles")
+  lavSafetyObservations          LavSafetyObservation[]
+  loginAuditLogs                 LoginAuditLog[]
+  stationAccesses                UserStationAccess[]
+  profileImageFile               File?                         @relation("UserProfileImage", fields: [profileImageFileId], references: [id])
 
   @@index([firstName, lastName])
   @@map("users")
@@ -67,12 +69,13 @@ model Station {
   name                         String
   timezone                     String
   isActive                     Boolean                       @default(true)
-  createdAt                    DateTime @db.Timestamptz(3)                      @default(now())
-  updatedAt                    DateTime @db.Timestamptz(3)                      @updatedAt
+  createdAt                    DateTime                      @default(now()) @db.Timestamptz(3)
+  updatedAt                    DateTime                      @updatedAt @db.Timestamptz(3)
   feedbacks                    AppFeedback[]
   authSessions                 AuthSession[]
   cabinQualityAudits           CabinQualityAudit[]
   cabinSecuritySearchTrainings CabinSecuritySearchTraining[]
+  hiddenObjectAuditSessions    HiddenObjectAuditSession[]
   chatConversations            ChatConversation[]
   employeeOneOnOnes            EmployeeOneOnOne[]
   endOfShiftReports            EndOfShiftReport[]
@@ -91,8 +94,8 @@ model Gate {
   gateCode                     String
   name                         String?
   isActive                     Boolean                       @default(true)
-  createdAt                    DateTime @db.Timestamptz(3)                      @default(now())
-  updatedAt                    DateTime @db.Timestamptz(3)                      @updatedAt
+  createdAt                    DateTime                      @default(now()) @db.Timestamptz(3)
+  updatedAt                    DateTime                      @updatedAt @db.Timestamptz(3)
   cabinQualityAudits           CabinQualityAudit[]
   cabinSecuritySearchTrainings CabinSecuritySearchTraining[]
   station                      Station                       @relation(fields: [stationId], references: [id])
@@ -110,8 +113,8 @@ model UserStationAccess {
   roleId    String   @db.Uuid
   isDefault Boolean  @default(false)
   isActive  Boolean  @default(true)
-  createdAt DateTime @db.Timestamptz(3) @default(now())
-  updatedAt DateTime @db.Timestamptz(3) @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
   role      Role     @relation(fields: [roleId], references: [id])
   station   Station  @relation(fields: [stationId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -164,10 +167,11 @@ model ShiftOccurrence {
   stationId                    String                        @db.Uuid
   shiftDefinitionId            String                        @db.Uuid
   businessDate                 DateTime                      @db.Date
-  startsAt                     DateTime @db.Timestamptz(3)
-  endsAt                       DateTime @db.Timestamptz(3)
+  startsAt                     DateTime                      @db.Timestamptz(3)
+  endsAt                       DateTime                      @db.Timestamptz(3)
   cabinQualityAudits           CabinQualityAudit[]
   cabinSecuritySearchTrainings CabinSecuritySearchTraining[]
+  hiddenObjectAuditSessions    HiddenObjectAuditSession[]
   endOfShiftReports            EndOfShiftReport[]
   lavSafetyObservations        LavSafetyObservation[]
   shiftDefinition              ShiftDefinition               @relation(fields: [shiftDefinitionId], references: [id], onDelete: Cascade)
@@ -190,14 +194,16 @@ model CleanType {
 }
 
 model AircraftType {
-  id        String   @id @default(uuid()) @db.Uuid
-  code      String   @unique
-  name      String
-  sortOrder Int      @default(0)
-  isActive  Boolean  @default(true)
-  seatMapJson Json?
-  createdAt DateTime @db.Timestamptz(3) @default(now())
-  updatedAt DateTime @db.Timestamptz(3) @updatedAt
+  id                        String                     @id @default(uuid()) @db.Uuid
+  code                      String                     @unique
+  name                      String
+  sortOrder                 Int                        @default(0)
+  isActive                  Boolean                    @default(true)
+  seatMapJson               Json?
+  createdAt                 DateTime                   @default(now()) @db.Timestamptz(3)
+  updatedAt                 DateTime                   @updatedAt @db.Timestamptz(3)
+  fleetAircraft             FleetAircraft[]
+  hiddenObjectAuditSessions HiddenObjectAuditSession[]
 
   @@map("aircraft_types")
 }
@@ -215,12 +221,13 @@ model File {
   scanStatus                           ScanStatus                              @default(PENDING)
   encryptedAtRest                      Boolean                                 @default(false)
   uploadedByUserId                     String?                                 @db.Uuid
-  createdAt                            DateTime @db.Timestamptz(3)                                @default(now())
+  createdAt                            DateTime                                @default(now()) @db.Timestamptz(3)
   cabinQualityAuditLinks               CabinQualityAuditFile[]
   cabinQualityResponseLinks            CabinQualityAuditResponseFile[]
   cabinQualitySignatureFor             CabinQualityAudit[]                     @relation("CabinQualityAuditSignature")
   securityTrainingLinks                CabinSecuritySearchTrainingFile[]
   securityTrainingResultLinks          CabinSecuritySearchTrainingResultFile[]
+  hiddenObjectAuditLocationLinks       HiddenObjectAuditLocationFile[]
   chatConversationAvatarFor            ChatConversation[]                      @relation("ChatConversationAvatar")
   chatMessageFileLinks                 ChatMessageFile[]
   employeeOneOnOneAudioFor             EmployeeOneOnOne[]                      @relation("EmployeeOneOnOneAudio")
@@ -248,10 +255,10 @@ model AuthSession {
   deviceName       String?
   ipAddress        String?
   userAgent        String?
-  expiresAt        DateTime @db.Timestamptz(3)
+  expiresAt        DateTime  @db.Timestamptz(3)
   lastUsedAt       DateTime? @db.Timestamptz(3)
   revokedAt        DateTime? @db.Timestamptz(3)
-  createdAt        DateTime @db.Timestamptz(3)  @default(now())
+  createdAt        DateTime  @default(now()) @db.Timestamptz(3)
   activeStation    Station?  @relation(fields: [activeStationId], references: [id])
   user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -261,19 +268,19 @@ model AuthSession {
 }
 
 model AccountRecoveryRequest {
-  id             String              @id @default(uuid()) @db.Uuid
-  userId         String?             @db.Uuid
-  requestedEmail String
-  recoveryType   RecoveryType
-  tokenHash      String?             @unique
+  id                   String              @id @default(uuid()) @db.Uuid
+  userId               String?             @db.Uuid
+  requestedEmail       String
+  recoveryType         RecoveryType
+  tokenHash            String?             @unique
   verificationCodeHash String?
-  expiresAt      DateTime? @db.Timestamptz(3)
-  consumedAt     DateTime? @db.Timestamptz(3)
-  status         RecoveryStatus      @default(REQUESTED)
-  requestedIp    String?
-  createdAt      DateTime @db.Timestamptz(3)            @default(now())
-  user           User?               @relation(fields: [userId], references: [id])
-  notifications  EmailNotification[]
+  expiresAt            DateTime?           @db.Timestamptz(3)
+  consumedAt           DateTime?           @db.Timestamptz(3)
+  status               RecoveryStatus      @default(REQUESTED)
+  requestedIp          String?
+  createdAt            DateTime            @default(now()) @db.Timestamptz(3)
+  user                 User?               @relation(fields: [userId], references: [id])
+  notifications        EmailNotification[]
 
   @@index([requestedEmail, createdAt])
   @@index([requestedEmail, recoveryType, status, createdAt])
@@ -290,9 +297,9 @@ model EmailNotification {
   payloadJson       Json?
   providerMessageId String?                 @unique
   status            NotificationStatus      @default(PENDING)
-  sentAt            DateTime? @db.Timestamptz(3)
-  failedAt          DateTime? @db.Timestamptz(3)
-  createdAt         DateTime @db.Timestamptz(3)                @default(now())
+  sentAt            DateTime?               @db.Timestamptz(3)
+  failedAt          DateTime?               @db.Timestamptz(3)
+  createdAt         DateTime                @default(now()) @db.Timestamptz(3)
   request           AccountRecoveryRequest? @relation(fields: [requestId], references: [id])
   user              User?                   @relation(fields: [userId], references: [id])
 
@@ -308,7 +315,7 @@ model LoginAuditLog {
   failureReason String?
   ipAddress     String?
   userAgent     String?
-  createdAt     DateTime @db.Timestamptz(3) @default(now())
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
   user          User?    @relation(fields: [userId], references: [id])
 
   @@index([attemptedUid, createdAt])
@@ -338,15 +345,15 @@ model CabinQualityAudit {
   auditorRoleSnapshot String
   gateCodeSnapshot    String
   cleanTypeSnapshot   String
-  auditAt             DateTime @db.Timestamptz(3)                    @default(now())
+  auditAt             DateTime                    @default(now()) @db.Timestamptz(3)
   detailedResultsJson Json?
   otherFindings       String?
   additionalNotes     String?
   signatureFileId     String                      @db.Uuid
   status              AuditRecordStatus           @default(SUBMITTED)
-  submittedAt         DateTime @db.Timestamptz(3)                    @default(now())
-  createdAt           DateTime @db.Timestamptz(3)                    @default(now())
-  updatedAt           DateTime @db.Timestamptz(3)                    @updatedAt
+  submittedAt         DateTime                    @default(now()) @db.Timestamptz(3)
+  createdAt           DateTime                    @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime                    @updatedAt @db.Timestamptz(3)
   files               CabinQualityAuditFile[]
   responses           CabinQualityAuditResponse[]
   auditorUser         User                        @relation(fields: [auditorUserId], references: [id])
@@ -421,16 +428,16 @@ model LavSafetyObservation {
   auditorNameSnapshot String
   auditorRoleSnapshot String
   gateCodeSnapshot    String
-  observedAt          DateTime @db.Timestamptz(3)                       @default(now())
+  observedAt          DateTime                       @default(now()) @db.Timestamptz(3)
   driverName          String
   shipNumber          String
   otherFindings       String?
   additionalNotes     String?
   signatureFileId     String                         @db.Uuid
   status              AuditRecordStatus              @default(SUBMITTED)
-  submittedAt         DateTime @db.Timestamptz(3)                       @default(now())
-  createdAt           DateTime @db.Timestamptz(3)                       @default(now())
-  updatedAt           DateTime @db.Timestamptz(3)                       @updatedAt
+  submittedAt         DateTime                       @default(now()) @db.Timestamptz(3)
+  createdAt           DateTime                       @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime                       @updatedAt @db.Timestamptz(3)
   files               LavSafetyObservationFile[]
   responses           LavSafetyObservationResponse[]
   auditorUser         User                           @relation(fields: [auditorUserId], references: [id])
@@ -495,6 +502,21 @@ model SecuritySearchArea {
   @@map("security_search_areas")
 }
 
+model FleetAircraft {
+  id                        String                     @id @default(uuid()) @db.Uuid
+  shipNumber                String                     @unique
+  displayName               String?
+  aircraftTypeId            String                     @db.Uuid
+  isActive                  Boolean                    @default(true)
+  createdAt                 DateTime                   @default(now()) @db.Timestamptz(3)
+  updatedAt                 DateTime                   @updatedAt @db.Timestamptz(3)
+  aircraftType              AircraftType               @relation(fields: [aircraftTypeId], references: [id])
+  hiddenObjectAuditSessions HiddenObjectAuditSession[]
+
+  @@index([aircraftTypeId])
+  @@map("fleet_aircraft")
+}
+
 model CabinSecuritySearchTraining {
   id                  String                              @id @default(uuid()) @db.Uuid
   stationId           String                              @db.Uuid
@@ -504,16 +526,16 @@ model CabinSecuritySearchTraining {
   auditorNameSnapshot String
   auditorRoleSnapshot String
   gateCodeSnapshot    String
-  trainingAt          DateTime @db.Timestamptz(3)                            @default(now())
+  trainingAt          DateTime                            @default(now()) @db.Timestamptz(3)
   shipNumber          String
   detailedResultsJson Json?
   otherFindings       String?
   additionalNotes     String?
   overallResult       PassFail
   status              AuditRecordStatus                   @default(SUBMITTED)
-  submittedAt         DateTime @db.Timestamptz(3)                            @default(now())
-  createdAt           DateTime @db.Timestamptz(3)                            @default(now())
-  updatedAt           DateTime @db.Timestamptz(3)                            @updatedAt
+  submittedAt         DateTime                            @default(now()) @db.Timestamptz(3)
+  createdAt           DateTime                            @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime                            @updatedAt @db.Timestamptz(3)
   files               CabinSecuritySearchTrainingFile[]
   results             CabinSecuritySearchTrainingResult[]
   auditorUser         User                                @relation(fields: [auditorUserId], references: [id])
@@ -526,6 +548,76 @@ model CabinSecuritySearchTraining {
   @@index([overallResult])
   @@index([status])
   @@map("cabin_security_search_trainings")
+}
+
+model HiddenObjectAuditSession {
+  id                       String                      @id @default(uuid()) @db.Uuid
+  stationId                String                      @db.Uuid
+  shiftOccurrenceId        String?                     @db.Uuid
+  auditorUserId            String                      @db.Uuid
+  auditorNameSnapshot      String
+  auditorRoleSnapshot      String
+  aircraftTypeId           String                      @db.Uuid
+  aircraftTypeNameSnapshot String
+  fleetAircraftId          String                      @db.Uuid
+  shipNumberSnapshot       String
+  objectsToHideCount       Int
+  sessionAt                DateTime                    @default(now()) @db.Timestamptz(3)
+  setupCompletedAt         DateTime?                   @db.Timestamptz(3)
+  activatedAt              DateTime?                   @db.Timestamptz(3)
+  closedAt                 DateTime?                   @db.Timestamptz(3)
+  status                   HiddenObjectAuditStatus     @default(SETUP)
+  createdAt                DateTime                    @default(now()) @db.Timestamptz(3)
+  updatedAt                DateTime                    @updatedAt @db.Timestamptz(3)
+  aircraftType             AircraftType                @relation(fields: [aircraftTypeId], references: [id])
+  auditorUser              User                        @relation("HiddenObjectAuditAuditor", fields: [auditorUserId], references: [id])
+  fleetAircraft            FleetAircraft               @relation(fields: [fleetAircraftId], references: [id])
+  locations                HiddenObjectAuditLocation[]
+  shiftOccurrence          ShiftOccurrence?            @relation(fields: [shiftOccurrenceId], references: [id])
+  station                  Station                     @relation(fields: [stationId], references: [id])
+
+  @@index([stationId, sessionAt])
+  @@index([auditorUserId])
+  @@index([status])
+  @@index([aircraftTypeId])
+  @@map("hidden_object_audit_sessions")
+}
+
+model HiddenObjectAuditLocation {
+  id                  String                          @id @default(uuid()) @db.Uuid
+  sessionId           String                          @db.Uuid
+  locationCode        String
+  locationLabel       String
+  sectionLabel        String
+  locationType        HiddenObjectLocationType
+  status              HiddenObjectLocationStatus      @default(ORANGE)
+  subLocation         String?
+  hiddenConfirmedAt   DateTime?                       @db.Timestamptz(3)
+  foundAt             DateTime?                       @db.Timestamptz(3)
+  foundByUserId       String?                         @db.Uuid
+  foundByNameSnapshot String?
+  createdAt           DateTime                        @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime                        @updatedAt @db.Timestamptz(3)
+  files               HiddenObjectAuditLocationFile[]
+  foundByUser         User?                           @relation("HiddenObjectAuditLocationFoundBy", fields: [foundByUserId], references: [id])
+  session             HiddenObjectAuditSession        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, locationCode])
+  @@index([sessionId, status])
+  @@index([foundByUserId])
+  @@map("hidden_object_audit_locations")
+}
+
+model HiddenObjectAuditLocationFile {
+  locationId String                    @db.Uuid
+  fileId     String                    @db.Uuid
+  sortOrder  Int                       @default(0)
+  file       File                      @relation(fields: [fileId], references: [id])
+  location   HiddenObjectAuditLocation @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@id([locationId, fileId])
+  @@index([fileId])
+  @@map("hidden_object_audit_location_files")
 }
 
 model CabinSecuritySearchTrainingResult {
@@ -574,7 +666,7 @@ model EndOfShiftReport {
   supervisorUserId        String                  @db.Uuid
   supervisorNameSnapshot  String
   supervisorRoleSnapshot  String
-  reportAt                DateTime @db.Timestamptz(3)                @default(now())
+  reportAt                DateTime                @default(now()) @db.Timestamptz(3)
   lavObservationCompleted Boolean
   lavObservationReason    String?
   cabinQualityCompleted   Boolean
@@ -588,9 +680,9 @@ model EndOfShiftReport {
   delayCount              Int?
   additionalNotes         String?
   status                  AuditRecordStatus       @default(SUBMITTED)
-  submittedAt             DateTime @db.Timestamptz(3)                @default(now())
-  createdAt               DateTime @db.Timestamptz(3)                @default(now())
-  updatedAt               DateTime @db.Timestamptz(3)                @updatedAt
+  submittedAt             DateTime                @default(now()) @db.Timestamptz(3)
+  createdAt               DateTime                @default(now()) @db.Timestamptz(3)
+  updatedAt               DateTime                @updatedAt @db.Timestamptz(3)
   delays                  EndOfShiftReportDelay[]
   files                   EndOfShiftReportFile[]
   shiftOccurrence         ShiftOccurrence?        @relation(fields: [shiftOccurrenceId], references: [id])
@@ -640,7 +732,7 @@ model EmployeeOneOnOne {
   leaderNameSnapshot      String
   leaderRoleSnapshot      String
   employeeNameSnapshot    String
-  meetingAt               DateTime @db.Timestamptz(3)          @default(now())
+  meetingAt               DateTime          @default(now()) @db.Timestamptz(3)
   discussionText          String?
   discussionAudioFileId   String?           @db.Uuid
   additionalNote          String?
@@ -648,9 +740,9 @@ model EmployeeOneOnOne {
   employeeSignatureFileId String?           @db.Uuid
   leaderSignatureFileId   String            @db.Uuid
   status                  AuditRecordStatus @default(SUBMITTED)
-  submittedAt             DateTime @db.Timestamptz(3)          @default(now())
-  createdAt               DateTime @db.Timestamptz(3)          @default(now())
-  updatedAt               DateTime @db.Timestamptz(3)          @updatedAt
+  submittedAt             DateTime          @default(now()) @db.Timestamptz(3)
+  createdAt               DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt               DateTime          @updatedAt @db.Timestamptz(3)
   discussionAudioFile     File?             @relation("EmployeeOneOnOneAudio", fields: [discussionAudioFileId], references: [id])
   employeeSignatureFile   File?             @relation("EmployeeOneOnOneEmployeeSignature", fields: [employeeSignatureFileId], references: [id])
   employeeUser            User              @relation("EmployeeOneOnOnes", fields: [employeeUserId], references: [id])
@@ -671,7 +763,7 @@ model AppFeedback {
   submittedByUserId   String      @db.Uuid
   userNameSnapshot    String
   userRoleSnapshot    String
-  submittedAt         DateTime @db.Timestamptz(3)    @default(now())
+  submittedAt         DateTime    @default(now()) @db.Timestamptz(3)
   overallSatisfaction RatingScale
   easeOfUse           RatingScale
   appPerformance      RatingScale
@@ -695,9 +787,9 @@ model ChatConversation {
   directPairKey    String?                       @unique
   avatarFileId     String?                       @db.Uuid
   lastMessageId    String?                       @unique @db.Uuid
-  lastMessageAt    DateTime? @db.Timestamptz(3)
-  createdAt        DateTime @db.Timestamptz(3)                      @default(now())
-  updatedAt        DateTime @db.Timestamptz(3)                      @updatedAt
+  lastMessageAt    DateTime?                     @db.Timestamptz(3)
+  createdAt        DateTime                      @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime                      @updatedAt @db.Timestamptz(3)
   participants     ChatConversationParticipant[]
   avatarFile       File?                         @relation("ChatConversationAvatar", fields: [avatarFileId], references: [id])
   createdByUser    User                          @relation("ChatConversationCreatedBy", fields: [createdByUserId], references: [id])
@@ -718,9 +810,9 @@ model ChatConversationParticipant {
   isFavorite        Boolean                @default(false)
   isMuted           Boolean                @default(false)
   lastReadMessageId String?                @db.Uuid
-  lastReadAt        DateTime? @db.Timestamptz(3)
-  joinedAt          DateTime @db.Timestamptz(3)               @default(now())
-  leftAt            DateTime? @db.Timestamptz(3)
+  lastReadAt        DateTime?              @db.Timestamptz(3)
+  joinedAt          DateTime               @default(now()) @db.Timestamptz(3)
+  leftAt            DateTime?              @db.Timestamptz(3)
   conversation      ChatConversation       @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   lastReadMessage   ChatMessage?           @relation("ParticipantLastReadMessage", fields: [lastReadMessageId], references: [id])
   user              User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -738,9 +830,9 @@ model ChatMessage {
   messageType            MessageType
   encryptedPayload       String?
   previewText            String?
-  createdAt              DateTime @db.Timestamptz(3)                      @default(now())
-  editedAt               DateTime? @db.Timestamptz(3)
-  deletedAt              DateTime? @db.Timestamptz(3)
+  createdAt              DateTime                      @default(now()) @db.Timestamptz(3)
+  editedAt               DateTime?                     @db.Timestamptz(3)
+  deletedAt              DateTime?                     @db.Timestamptz(3)
   contact                ChatContact?
   lastReadByParticipants ChatConversationParticipant[] @relation("ParticipantLastReadMessage")
   lastForConversation    ChatConversation?             @relation("ChatConversationLastMessage")
@@ -760,8 +852,8 @@ model ChatMessage {
 model ChatMessageReceipt {
   messageId       String      @db.Uuid
   recipientUserId String      @db.Uuid
-  deliveredAt     DateTime? @db.Timestamptz(3)
-  readAt          DateTime? @db.Timestamptz(3)
+  deliveredAt     DateTime?   @db.Timestamptz(3)
+  readAt          DateTime?   @db.Timestamptz(3)
   message         ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
   recipientUser   User        @relation("ChatMessageRecipient", fields: [recipientUserId], references: [id], onDelete: Cascade)
 
@@ -810,7 +902,7 @@ model ChatPollVote {
   id          String         @id @default(uuid()) @db.Uuid
   optionId    String         @db.Uuid
   voterUserId String         @db.Uuid
-  votedAt     DateTime @db.Timestamptz(3)       @default(now())
+  votedAt     DateTime       @default(now()) @db.Timestamptz(3)
   option      ChatPollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
   voterUser   User           @relation(fields: [voterUserId], references: [id], onDelete: Cascade)
 
@@ -823,8 +915,8 @@ model ChatEvent {
   messageId             String      @id @db.Uuid
   eventName             String
   description           String?
-  startAt               DateTime @db.Timestamptz(3)
-  endAt                 DateTime? @db.Timestamptz(3)
+  startAt               DateTime    @db.Timestamptz(3)
+  endAt                 DateTime?   @db.Timestamptz(3)
   locationText          String?
   callType              CallType?
   callLinkUrl           String?
@@ -841,8 +933,8 @@ model ChatLocation {
   latitude      Decimal      @db.Decimal(10, 7)
   longitude     Decimal      @db.Decimal(10, 7)
   addressText   String?
-  liveExpiresAt DateTime? @db.Timestamptz(3)
-  lastUpdatedAt DateTime? @db.Timestamptz(3)
+  liveExpiresAt DateTime?    @db.Timestamptz(3)
+  lastUpdatedAt DateTime?    @db.Timestamptz(3)
   message       ChatMessage  @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
   @@map("chat_locations")
@@ -914,6 +1006,27 @@ enum PassFail {
   FAIL
 }
 
+enum HiddenObjectAuditStatus {
+  SETUP
+  ACTIVE
+  CLOSED
+}
+
+enum HiddenObjectLocationStatus {
+  ORANGE
+  BLUE
+  GREEN
+  RED
+}
+
+enum HiddenObjectLocationType {
+  SEAT
+  GALLEY
+  LAV
+  JUMP_SEAT
+  ZONE
+}
+
 enum DelayType {
   PRIMARY
   SECONDARY
@@ -968,4 +1081,3 @@ enum CallType {
   VIDEO
   VOICE
 }
-

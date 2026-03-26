@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { PassFail } from '../../../generated/prisma/enums.js';
+import { PassFail } from '../../../generated/prisma-client/enums.js';
 import {
   ArrayMinSize,
   IsArray,
@@ -133,3 +133,4 @@ export class CreateCabinSecuritySearchTrainingDto {
   @IsUUID('4', { each: true })
   generalPictureFileIds?: string[];
 }
+

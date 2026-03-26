@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { RatingScale } from '../../../generated/prisma/enums.js';
+import { RatingScale } from '../../../generated/prisma-client/enums.js';
 import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreateFeedbackDto {
@@ -33,3 +33,4 @@ export class CreateFeedbackDto {
   @MaxLength(3000)
   performanceIssues?: string;
 }
+

@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { FileCategory } from '../../../generated/prisma/enums.js';
+import { FileCategory } from '../../../generated/prisma-client/enums.js';
 import { IsEnum, IsOptional } from 'class-validator';
 
 export class UploadFileDto {
@@ -8,3 +8,4 @@ export class UploadFileDto {
   @IsEnum(FileCategory)
   category?: FileCategory;
 }
+

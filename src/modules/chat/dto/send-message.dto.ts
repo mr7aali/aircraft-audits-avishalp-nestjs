@@ -4,7 +4,7 @@ import {
   CallType,
   LocationType,
   MessageType,
-} from '../../../generated/prisma/enums.js';
+} from '../../../generated/prisma-client/enums.js';
 import {
   ArrayMinSize,
   IsArray,
@@ -215,3 +215,4 @@ export class PollVoteDto {
   @IsUUID('4', { each: true })
   optionIds!: string[];
 }
+

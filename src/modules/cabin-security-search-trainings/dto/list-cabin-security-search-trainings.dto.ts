@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { PassFail } from '../../../generated/prisma/enums.js';
+import { PassFail } from '../../../generated/prisma-client/enums.js';
 import {
   IsArray,
   IsDateString,
@@ -58,3 +58,4 @@ export class ListCabinSecuritySearchTrainingsDto extends PaginationQueryDto {
   @IsUUID()
   gateId?: string;
 }
+

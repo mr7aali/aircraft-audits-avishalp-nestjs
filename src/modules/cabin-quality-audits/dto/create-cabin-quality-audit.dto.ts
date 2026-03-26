@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { YesNoNa } from '../../../generated/prisma/enums.js';
+import { YesNoNa } from '../../../generated/prisma-client/enums.js';
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -124,3 +124,4 @@ export class CreateCabinQualityAuditDto {
   @IsUUID('4', { each: true })
   generalPictureFileIds?: string[];
 }
+

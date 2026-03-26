@@ -252,6 +252,54 @@ export class UpdateAircraftTypeDto {
   isActive?: boolean;
 }
 
+export class CreateFleetAircraftDto {
+  @ApiProperty()
+  @IsString()
+  @MaxLength(40)
+  shipNumber!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  displayName?: string;
+
+  @ApiProperty()
+  @IsUUID()
+  aircraftTypeId!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(toBoolean)
+  @IsBoolean()
+  isActive?: boolean;
+}
+
+export class UpdateFleetAircraftDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  shipNumber?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  displayName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  aircraftTypeId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(toBoolean)
+  @IsBoolean()
+  isActive?: boolean;
+}
+
 export class AircraftSeatMapAmenityDto {
   @ApiPropertyOptional()
   @IsOptional()

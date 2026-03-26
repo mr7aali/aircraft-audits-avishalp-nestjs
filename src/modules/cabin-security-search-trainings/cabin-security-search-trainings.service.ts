@@ -4,8 +4,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '../../generated/prisma/client.js';
-import { PassFail } from '../../generated/prisma/enums.js';
+import { Prisma } from '../../generated/prisma-client/client.js';
+import { PassFail } from '../../generated/prisma-client/enums.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuthenticatedUser } from '../../common/types/authenticated-user.type.js';
 import { buildPaginatedResult } from '../../common/utils/pagination.util.js';
@@ -329,3 +329,4 @@ export class CabinSecuritySearchTrainingsService {
     return `${baseCode || 'AREA'}_${randomUUID().slice(0, 8).toUpperCase()}`;
   }
 }
+

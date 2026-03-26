@@ -4,17 +4,19 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '../../generated/prisma/client.js';
+import { Prisma } from '../../generated/prisma-client/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import {
   CreateAircraftTypeDto,
   AircraftSeatMapDto,
   CreateCleanTypeDto,
+  CreateFleetAircraftDto,
   CreateGateDto,
   CreateStationDto,
   UpdateAircraftSeatMapDto,
   UpdateAircraftTypeDto,
   UpdateCleanTypeDto,
+  UpdateFleetAircraftDto,
   UpdateGateDto,
   UpdateStationDto,
 } from './dto/manage-master-data.dto.js';
@@ -85,6 +87,16 @@ export class MasterDataService {
       .then((record) => this.mapAircraftTypeRecord(record));
   }
 
+  getFleetAircraft(includeInactive = false) {
+    return this.prisma.fleetAircraft.findMany({
+      where: includeInactive ? undefined : { isActive: true },
+      include: {
+        aircraftType: true,
+      },
+      orderBy: [{ shipNumber: 'asc' }],
+    });
+  }
+
   async updateAircraftType(id: string, dto: UpdateAircraftTypeDto) {
     await this.ensureExists('aircraftType', id, 'Aircraft type');
     return this.prisma.aircraftType
@@ -100,6 +112,47 @@ export class MasterDataService {
       .then((record) => this.mapAircraftTypeRecord(record));
   }
 
+  async createFleetAircraft(dto: CreateFleetAircraftDto) {
+    await this.ensureExists('aircraftType', dto.aircraftTypeId, 'Aircraft type');
+    return this.prisma.fleetAircraft.create({
+      data: {
+        shipNumber: this.normalizeShipNumber(dto.shipNumber),
+        displayName: dto.displayName?.trim() || null,
+        aircraftTypeId: dto.aircraftTypeId,
+        isActive: dto.isActive ?? true,
+      },
+      include: {
+        aircraftType: true,
+      },
+    });
+  }
+
+  async updateFleetAircraft(id: string, dto: UpdateFleetAircraftDto) {
+    await this.ensureExists('fleetAircraft', id, 'Fleet aircraft');
+    if (dto.aircraftTypeId) {
+      await this.ensureExists('aircraftType', dto.aircraftTypeId, 'Aircraft type');
+    }
+
+    return this.prisma.fleetAircraft.update({
+      where: { id },
+      data: {
+        ...(dto.shipNumber != null
+          ? { shipNumber: this.normalizeShipNumber(dto.shipNumber) }
+          : {}),
+        ...(dto.displayName != null
+          ? { displayName: dto.displayName.trim() || null }
+          : {}),
+        ...(dto.aircraftTypeId != null
+          ? { aircraftTypeId: dto.aircraftTypeId }
+          : {}),
+        ...(dto.isActive != null ? { isActive: dto.isActive } : {}),
+      },
+      include: {
+        aircraftType: true,
+      },
+    });
+  }
+
   async deleteAircraftType(id: string) {
     await this.ensureExists('aircraftType', id, 'Aircraft type');
     return this.deleteWithReferenceGuard('Aircraft type', () =>
@@ -108,6 +161,15 @@ export class MasterDataService {
           where: { id },
         })
         .then((record) => this.mapAircraftTypeRecord(record)),
+    );
+  }
+
+  async deleteFleetAircraft(id: string) {
+    await this.ensureExists('fleetAircraft', id, 'Fleet aircraft');
+    return this.deleteWithReferenceGuard('Fleet aircraft', () =>
+      this.prisma.fleetAircraft.delete({
+        where: { id },
+      }),
     );
   }
 
@@ -254,7 +316,7 @@ export class MasterDataService {
   }
 
   private async ensureExists(
-    model: 'cleanType' | 'aircraftType' | 'station' | 'gate',
+    model: 'cleanType' | 'aircraftType' | 'fleetAircraft' | 'station' | 'gate',
     id: string,
     label: string,
   ) {
@@ -275,6 +337,12 @@ export class MasterDataService {
         break;
       case 'station':
         entity = await this.prisma.station.findUnique({
+          where: { id },
+          select: { id: true },
+        });
+        break;
+      case 'fleetAircraft':
+        entity = await this.prisma.fleetAircraft.findUnique({
           where: { id },
           select: { id: true },
         });
@@ -322,6 +390,10 @@ export class MasterDataService {
       ...rest,
       seatMap: seatMapJson ?? null,
     };
+  }
+
+  private normalizeShipNumber(value: string) {
+    return value.trim().toUpperCase();
   }
 
   private validateAircraftSeatMap(seatMap: AircraftSeatMapDto) {
@@ -456,3 +528,4 @@ export class MasterDataService {
     };
   }
 }
+

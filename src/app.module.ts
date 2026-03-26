@@ -25,6 +25,7 @@ import { FeedbackModule } from './modules/feedback/feedback.module.js';
 import { ChatModule } from './modules/chat/chat.module.js';
 import { CommonModule } from './common/common.module.js';
 import { AdminDashboardModule } from './modules/admin-dashboard/admin-dashboard.module.js';
+import { HiddenObjectAuditsModule } from './modules/hidden-object-audits/hidden-object-audits.module.js';
 
 @Module({
   imports: [
@@ -124,6 +125,7 @@ import { AdminDashboardModule } from './modules/admin-dashboard/admin-dashboard.
     FeedbackModule,
     ChatModule,
     AdminDashboardModule,
+    HiddenObjectAuditsModule,
   ],
   providers: [
     {

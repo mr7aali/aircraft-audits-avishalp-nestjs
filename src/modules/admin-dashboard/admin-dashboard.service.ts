@@ -1,6 +1,11 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
-import { Prisma } from '../../generated/prisma/client.js';
-import { PassFail, YesNoNa } from '../../generated/prisma/enums.js';
+import { Prisma } from '../../generated/prisma-client/client.js';
+import {
+  HiddenObjectAuditStatus,
+  HiddenObjectLocationStatus,
+  PassFail,
+  YesNoNa,
+} from '../../generated/prisma-client/enums.js';
 import { buildPaginatedResult } from '../../common/utils/pagination.util.js';
 import { AuthenticatedUser } from '../../common/types/authenticated-user.type.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
@@ -18,7 +23,7 @@ type AuditRecordItem = {
   auditorName: string;
   gateCode: string;
   score: number;
-  status: 'PASS' | 'FAIL';
+  status: 'PASS' | 'FAIL' | 'SETUP' | 'ACTIVE';
   summary: string;
 };
 
@@ -36,14 +41,17 @@ export class AdminDashboardService {
       gateCount,
       cleanTypeCount,
       aircraftTypeCount,
+      fleetAircraftCount,
       cabinQuality,
       cabinSecurity,
+      hiddenObject,
       lavSafety,
     ] = await Promise.all([
       this.prisma.station.findUnique({ where: { id: stationId } }),
       this.prisma.gate.count({ where: { stationId, isActive: true } }),
       this.prisma.cleanType.count({ where: { isActive: true } }),
       this.prisma.aircraftType.count({ where: { isActive: true } }),
+      this.prisma.fleetAircraft.count({ where: { isActive: true } }),
       this.prisma.cabinQualityAudit.findMany({
         where: this.buildCabinQualityWhere(stationId, query),
         include: { responses: true },
@@ -51,6 +59,10 @@ export class AdminDashboardService {
       this.prisma.cabinSecuritySearchTraining.findMany({
         where: this.buildCabinSecurityWhere(stationId, query),
         include: { results: true },
+      }),
+      this.prisma.hiddenObjectAuditSession.findMany({
+        where: this.buildHiddenObjectWhere(stationId, query),
+        include: { locations: true },
       }),
       this.prisma.lavSafetyObservation.findMany({
         where: this.buildLavSafetyWhere(stationId, query),
@@ -61,6 +73,7 @@ export class AdminDashboardService {
     const records = [
       ...cabinQuality.map((item) => this.toCabinQualityRecord(item)),
       ...cabinSecurity.map((item) => this.toCabinSecurityRecord(item)),
+      ...hiddenObject.map((item) => this.toHiddenObjectRecord(item)),
       ...lavSafety.map((item) => this.toLavSafetyRecord(item)),
     ].sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime());
 
@@ -70,6 +83,7 @@ export class AdminDashboardService {
         date: string;
         cabinQuality: number;
         cabinSecurity: number;
+        hiddenObject: number;
         lavSafety: number;
       }
     >();
@@ -80,6 +94,7 @@ export class AdminDashboardService {
         date,
         cabinQuality: 0,
         cabinSecurity: 0,
+        hiddenObject: 0,
         lavSafety: 0,
       };
 
@@ -87,6 +102,8 @@ export class AdminDashboardService {
         existing.cabinQuality += 1;
       } else if (record.auditType === AdminAuditType.CABIN_SECURITY) {
         existing.cabinSecurity += 1;
+      } else if (record.auditType === AdminAuditType.HIDDEN_OBJECT) {
+        existing.hiddenObject += 1;
       } else {
         existing.lavSafety += 1;
       }
@@ -100,11 +117,13 @@ export class AdminDashboardService {
         gates: gateCount,
         cleanTypes: cleanTypeCount,
         aircraftTypes: aircraftTypeCount,
+        fleetAircraft: fleetAircraftCount,
       },
       totals: {
         totalAudits: records.length,
         cabinQuality: cabinQuality.length,
         cabinSecurity: cabinSecurity.length,
+        hiddenObject: hiddenObject.length,
         lavSafety: lavSafety.length,
       },
       compliance: {
@@ -114,6 +133,9 @@ export class AdminDashboardService {
         ),
         cabinSecurityScore: this.averageScore(
           cabinSecurity.map((item) => this.scoreCabinSecurity(item.results).score),
+        ),
+        hiddenObjectScore: this.averageScore(
+          hiddenObject.map((item) => this.scoreHiddenObject(item).score),
         ),
         lavSafetyScore: this.averageScore(
           lavSafety.map((item) => this.scoreLavSafety(item.responses).score),
@@ -126,6 +148,9 @@ export class AdminDashboardService {
         ).length,
         cabinSecurity: cabinSecurity.filter(
           (item) => this.scoreCabinSecurity(item.results).status === 'FAIL',
+        ).length,
+        hiddenObject: hiddenObject.filter(
+          (item) => this.scoreHiddenObject(item).status === 'FAIL',
         ).length,
         lavSafety: lavSafety.filter(
           (item) => this.scoreLavSafety(item.responses).status === 'FAIL',
@@ -159,6 +184,14 @@ export class AdminDashboardService {
         include: { results: true },
       });
       records.push(...items.map((item) => this.toCabinSecurityRecord(item)));
+    }
+
+    if (!query.auditType || query.auditType === AdminAuditType.HIDDEN_OBJECT) {
+      const items = await this.prisma.hiddenObjectAuditSession.findMany({
+        where: this.buildHiddenObjectWhere(stationId, query),
+        include: { locations: true },
+      });
+      records.push(...items.map((item) => this.toHiddenObjectRecord(item)));
     }
 
     if (!query.auditType || query.auditType === AdminAuditType.LAV_SAFETY) {
@@ -251,6 +284,23 @@ export class AdminDashboardService {
     };
   }
 
+  private buildHiddenObjectWhere(
+    stationId: string,
+    query: AdminDashboardOverviewQueryDto | AdminDashboardAuditRecordsQueryDto,
+  ): Prisma.HiddenObjectAuditSessionWhereInput {
+    return {
+      stationId,
+      ...(query.fromDate || query.toDate
+        ? {
+            sessionAt: {
+              ...(query.fromDate ? { gte: new Date(query.fromDate) } : {}),
+              ...(query.toDate ? { lte: new Date(query.toDate) } : {}),
+            },
+          }
+        : {}),
+    };
+  }
+
   private toCabinQualityRecord(
     item: {
       id: string;
@@ -296,6 +346,31 @@ export class AdminDashboardService {
       score: result.score,
       status: result.status,
       summary: `Ship ${item.shipNumber}`,
+    };
+  }
+
+  private toHiddenObjectRecord(
+    item: {
+      id: string;
+      sessionAt: Date;
+      status: HiddenObjectAuditStatus;
+      auditorNameSnapshot: string;
+      shipNumberSnapshot: string;
+      aircraftTypeNameSnapshot: string;
+      locations: { status: HiddenObjectLocationStatus }[];
+    },
+  ): AuditRecordItem {
+    const result = this.scoreHiddenObject(item);
+    return {
+      id: item.id,
+      auditType: AdminAuditType.HIDDEN_OBJECT,
+      title: 'Hidden Object Audit',
+      occurredAt: item.sessionAt,
+      auditorName: item.auditorNameSnapshot,
+      gateCode: 'N/A',
+      score: result.score,
+      status: result.displayStatus,
+      summary: `${item.shipNumberSnapshot} • ${item.aircraftTypeNameSnapshot}`,
     };
   }
 
@@ -365,6 +440,36 @@ export class AdminDashboardService {
     };
   }
 
+  private scoreHiddenObject(item: {
+    status: HiddenObjectAuditStatus;
+    locations: { status: HiddenObjectLocationStatus }[];
+  }): {
+    score: number;
+    status: 'PASS' | 'FAIL';
+    displayStatus: 'PASS' | 'FAIL' | 'SETUP' | 'ACTIVE';
+  } {
+    const found = item.locations.filter(
+      (location) => location.status === HiddenObjectLocationStatus.GREEN,
+    ).length;
+    const notFound = item.locations.filter(
+      (location) => location.status === HiddenObjectLocationStatus.RED,
+    ).length;
+    const total = item.locations.length;
+    const finalStatus: 'PASS' | 'FAIL' = notFound > 0 ? 'FAIL' : 'PASS';
+    const displayStatus =
+      item.status === HiddenObjectAuditStatus.CLOSED
+        ? finalStatus
+        : item.status === HiddenObjectAuditStatus.ACTIVE
+          ? 'ACTIVE'
+          : 'SETUP';
+
+    return {
+      score: total === 0 ? 0 : Math.round((found / total) * 100),
+      status: finalStatus,
+      displayStatus,
+    };
+  }
+
   private averageScore(scores: number[]) {
     if (scores.length === 0) {
       return 100;
@@ -375,3 +480,4 @@ export class AdminDashboardService {
     );
   }
 }
+
