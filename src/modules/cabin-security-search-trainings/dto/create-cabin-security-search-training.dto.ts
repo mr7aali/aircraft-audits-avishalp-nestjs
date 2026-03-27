@@ -1,8 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { PassFail } from '../../../generated/prisma/enums.js';
+import { PassFail } from '../../../generated/prisma-client/enums.js';
 import {
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsEnum,
   IsOptional,
   IsString,
@@ -86,6 +87,16 @@ export class SecurityTrainingDetailedAreaDto {
   checkItems!: SecurityTrainingDetailedCheckItemDto[];
 }
 
+export class HiddenObjectLocationSearchResultDto {
+  @ApiProperty()
+  @IsUUID()
+  locationId!: string;
+
+  @ApiProperty()
+  @IsBoolean()
+  found!: boolean;
+}
+
 export class CreateCabinSecuritySearchTrainingDto {
   @ApiProperty()
   @IsString()
@@ -114,6 +125,18 @@ export class CreateCabinSecuritySearchTrainingDto {
   @ValidateNested({ each: true })
   @Type(() => SecurityTrainingDetailedAreaDto)
   detailedAreaResults?: SecurityTrainingDetailedAreaDto[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  hiddenObjectAuditId?: string;
+
+  @ApiPropertyOptional({ type: [HiddenObjectLocationSearchResultDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => HiddenObjectLocationSearchResultDto)
+  hiddenObjectLocationResults?: HiddenObjectLocationSearchResultDto[];
 
   @ApiPropertyOptional()
   @IsOptional()

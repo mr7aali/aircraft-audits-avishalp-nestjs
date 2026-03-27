@@ -7,7 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
-import { Prisma } from '../../generated/prisma/client.js';
+import { Prisma } from '../../generated/prisma-client/client.js';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -183,3 +183,4 @@ export class AllExceptionsFilter implements ExceptionFilter {
       : undefined;
   }
 }
+

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { DelayType } from '../../../generated/prisma/enums.js';
+import { DelayType } from '../../../generated/prisma-client/enums.js';
 import {
   IsArray,
   IsBoolean,
@@ -128,3 +128,4 @@ export class CreateEndOfShiftReportDto {
   @IsUUID('4', { each: true })
   additionalPictureFileIds?: string[];
 }
+

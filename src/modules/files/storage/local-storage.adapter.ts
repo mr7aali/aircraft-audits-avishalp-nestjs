@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { mkdir, writeFile } from 'fs/promises';
 import { dirname, join, resolve } from 'path';
-import type { File as StoredFileRecord } from '../../../generated/prisma/client.js';
+import type { File as StoredFileRecord } from '../../../generated/prisma-client/client.js';
 import { StorageAdapter, StoredFileResult } from './storage.adapter.js';
 
 @Injectable()
@@ -46,3 +46,4 @@ export class LocalStorageAdapter implements StorageAdapter {
     return join(this.getRootPath(), key);
   }
 }
+

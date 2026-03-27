@@ -5,6 +5,7 @@ import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto.js'
 export enum AdminAuditType {
   CABIN_QUALITY = 'CABIN_QUALITY',
   CABIN_SECURITY = 'CABIN_SECURITY',
+  HIDDEN_OBJECT = 'HIDDEN_OBJECT',
   LAV_SAFETY = 'LAV_SAFETY',
 }
 

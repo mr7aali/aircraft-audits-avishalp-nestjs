@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import nodemailer, { Transporter } from 'nodemailer';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { Prisma } from '../../generated/prisma/client.js';
+import { Prisma } from '../../generated/prisma-client/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import {
   EMAIL_NOTIFICATION_JOB,
@@ -177,3 +177,4 @@ Support Team`;
     return 'Notification';
   }
 }
+

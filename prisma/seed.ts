@@ -1,4 +1,4 @@
-import { Prisma, PrismaClient } from '../src/generated/prisma/client.js';
+import { Prisma, PrismaClient } from '../src/generated/prisma-client/client.js';
 import * as argon2 from 'argon2';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { DEFAULT_AIRCRAFT_SEAT_MAPS } from '../src/modules/master-data/aircraft-seat-map.defaults.js';
@@ -45,6 +45,7 @@ async function main() {
       ['CABIN_QUALITY_AUDIT', 'Cabin Quality Audit'],
       ['LAV_SAFETY_OBSERVATION', 'LAV Safety Observation'],
       ['CABIN_SECURITY_SEARCH_TRAINING', 'Cabin Security Search Training'],
+      ['HIDDEN_OBJECT_AUDIT', 'Hidden Object Audit'],
       ['END_OF_SHIFT_REPORT', 'End Of Shift Report'],
       ['EMPLOYEE_ONE_ON_ONE', 'Employee 1:1'],
       ['FEEDBACK', 'Feedback'],
@@ -68,6 +69,7 @@ async function main() {
       'CABIN_QUALITY_AUDIT',
       'LAV_SAFETY_OBSERVATION',
       'CABIN_SECURITY_SEARCH_TRAINING',
+      'HIDDEN_OBJECT_AUDIT',
       'END_OF_SHIFT_REPORT',
     ]) {
       await prisma.roleModuleAccess.upsert({
@@ -251,6 +253,45 @@ async function main() {
         isActive: true,
         seatMapJson:
           DEFAULT_AIRCRAFT_SEAT_MAPS[code] as unknown as Prisma.InputJsonValue,
+      },
+    });
+  }
+
+  const allAircraftTypes = await prisma.aircraftType.findMany({
+    select: { id: true, name: true },
+  });
+  const aircraftTypeIdByName = Object.fromEntries(
+    allAircraftTypes.map((item) => [item.name, item.id]),
+  );
+
+  const fleetAircraft = [
+    ['N751DN', 'Boeing 757-300 (75Y)', 'Delta Ship 751'],
+    ['N802DN', 'Boeing 737-800', 'Delta Ship 802'],
+    ['N320DL', 'Airbus A320', 'Delta Ship 320'],
+    ['N321DL', 'Airbus A321-200', 'Delta Ship 321'],
+    ['N319DL', 'Airbus A319', 'Delta Ship 319'],
+    ['N223DU', 'Airbus A220-300', 'Delta Ship 223'],
+    ['N939DN', 'Boeing 737-900ER', 'Delta Ship 939'],
+  ] as const;
+
+  for (const [shipNumber, aircraftTypeName, displayName] of fleetAircraft) {
+    const aircraftTypeId = aircraftTypeIdByName[aircraftTypeName];
+    if (!aircraftTypeId) {
+      continue;
+    }
+
+    await prisma.fleetAircraft.upsert({
+      where: { shipNumber },
+      update: {
+        aircraftTypeId,
+        displayName,
+        isActive: true,
+      },
+      create: {
+        shipNumber,
+        aircraftTypeId,
+        displayName,
+        isActive: true,
       },
     });
   }
@@ -533,3 +574,4 @@ main()
     await prisma.$disconnect();
     process.exit(1);
   });
+

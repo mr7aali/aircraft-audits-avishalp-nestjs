@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { DelayType } from '../../../generated/prisma/enums.js';
+import { DelayType } from '../../../generated/prisma-client/enums.js';
 import {
   IsArray,
   IsDateString,
@@ -81,3 +81,4 @@ export class ListEndOfShiftReportsDto extends PaginationQueryDto {
   @IsEnum(DelayType, { each: true })
   delayTypes?: DelayType[];
 }
+

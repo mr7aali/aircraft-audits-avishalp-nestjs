@@ -23,7 +23,7 @@ import {
   SendMessageDto,
 } from './dto/send-message.dto.js';
 import { ChatRealtimeService } from './chat-realtime.service.js';
-import { ConversationType, MessageType } from '../../generated/prisma/enums.js';
+import { ConversationType, MessageType } from '../../generated/prisma-client/enums.js';
 
 @Injectable()
 export class ChatService {
@@ -769,3 +769,4 @@ export class ChatService {
     return 'sent';
   }
 }
+

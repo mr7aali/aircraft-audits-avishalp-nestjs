@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '../../generated/prisma/client.js';
+import { Prisma } from '../../generated/prisma-client/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuthenticatedUser } from '../../common/types/authenticated-user.type.js';
 import { buildPaginatedResult } from '../../common/utils/pagination.util.js';
@@ -223,3 +223,4 @@ export class LavSafetyObservationsService {
     return observation;
   }
 }
+
