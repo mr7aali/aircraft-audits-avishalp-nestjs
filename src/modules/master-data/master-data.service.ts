@@ -12,12 +12,14 @@ import {
   CreateCleanTypeDto,
   CreateFleetAircraftDto,
   CreateGateDto,
+  CreateLavSafetyChecklistItemDto,
   CreateStationDto,
   UpdateAircraftSeatMapDto,
   UpdateAircraftTypeDto,
   UpdateCleanTypeDto,
   UpdateFleetAircraftDto,
   UpdateGateDto,
+  UpdateLavSafetyChecklistItemDto,
   UpdateStationDto,
 } from './dto/manage-master-data.dto.js';
 
@@ -68,10 +70,12 @@ export class MasterDataService {
   getAircraftTypes(includeInactive = false) {
     return this.prisma.aircraftType
       .findMany({
-      where: includeInactive ? undefined : { isActive: true },
-      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+        where: includeInactive ? undefined : { isActive: true },
+        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       })
-      .then((records) => records.map((record) => this.mapAircraftTypeRecord(record)));
+      .then((records) =>
+        records.map((record) => this.mapAircraftTypeRecord(record)),
+      );
   }
 
   createAircraftType(dto: CreateAircraftTypeDto) {
@@ -113,7 +117,11 @@ export class MasterDataService {
   }
 
   async createFleetAircraft(dto: CreateFleetAircraftDto) {
-    await this.ensureExists('aircraftType', dto.aircraftTypeId, 'Aircraft type');
+    await this.ensureExists(
+      'aircraftType',
+      dto.aircraftTypeId,
+      'Aircraft type',
+    );
     return this.prisma.fleetAircraft.create({
       data: {
         shipNumber: this.normalizeShipNumber(dto.shipNumber),
@@ -130,7 +138,11 @@ export class MasterDataService {
   async updateFleetAircraft(id: string, dto: UpdateFleetAircraftDto) {
     await this.ensureExists('fleetAircraft', id, 'Fleet aircraft');
     if (dto.aircraftTypeId) {
-      await this.ensureExists('aircraftType', dto.aircraftTypeId, 'Aircraft type');
+      await this.ensureExists(
+        'aircraftType',
+        dto.aircraftTypeId,
+        'Aircraft type',
+      );
     }
 
     return this.prisma.fleetAircraft.update({
@@ -194,11 +206,68 @@ export class MasterDataService {
     });
   }
 
-  getLavSafetyChecklistItems() {
+  getLavSafetyChecklistItems(includeInactive = false) {
     return this.prisma.lavSafetyChecklistItem.findMany({
-      where: { isActive: true },
+      where: includeInactive ? undefined : { isActive: true },
       orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }],
     });
+  }
+
+  createLavSafetyChecklistItem(dto: CreateLavSafetyChecklistItemDto) {
+    return this.prisma.lavSafetyChecklistItem.create({
+      data: {
+        code: dto.code.trim().toUpperCase(),
+        label: dto.label.trim(),
+        sortOrder: dto.sortOrder ?? 0,
+        isActive: dto.isActive ?? true,
+      },
+    });
+  }
+
+  async updateLavSafetyChecklistItem(
+    id: string,
+    dto: UpdateLavSafetyChecklistItemDto,
+  ) {
+    await this.ensureExists(
+      'lavSafetyChecklistItem',
+      id,
+      'LAV safety checklist item',
+    );
+    return this.prisma.lavSafetyChecklistItem.update({
+      where: { id },
+      data: {
+        ...(dto.code != null ? { code: dto.code.trim().toUpperCase() } : {}),
+        ...(dto.label != null ? { label: dto.label.trim() } : {}),
+        ...(dto.sortOrder != null ? { sortOrder: dto.sortOrder } : {}),
+        ...(dto.isActive != null ? { isActive: dto.isActive } : {}),
+      },
+    });
+  }
+
+  async deleteLavSafetyChecklistItem(id: string) {
+    await this.ensureExists(
+      'lavSafetyChecklistItem',
+      id,
+      'LAV safety checklist item',
+    );
+
+    const existingResponses =
+      await this.prisma.lavSafetyObservationResponse.count({
+        where: { checklistItemId: id },
+      });
+
+    if (existingResponses > 0) {
+      return this.prisma.lavSafetyChecklistItem.update({
+        where: { id },
+        data: { isActive: false },
+      });
+    }
+
+    return this.deleteWithReferenceGuard('LAV safety checklist item', () =>
+      this.prisma.lavSafetyChecklistItem.delete({
+        where: { id },
+      }),
+    );
   }
 
   getSecuritySearchAreas() {
@@ -316,7 +385,13 @@ export class MasterDataService {
   }
 
   private async ensureExists(
-    model: 'cleanType' | 'aircraftType' | 'fleetAircraft' | 'station' | 'gate',
+    model:
+      | 'cleanType'
+      | 'aircraftType'
+      | 'fleetAircraft'
+      | 'station'
+      | 'gate'
+      | 'lavSafetyChecklistItem',
     id: string,
     label: string,
   ) {
@@ -349,6 +424,12 @@ export class MasterDataService {
         break;
       case 'gate':
         entity = await this.prisma.gate.findUnique({
+          where: { id },
+          select: { id: true },
+        });
+        break;
+      case 'lavSafetyChecklistItem':
+        entity = await this.prisma.lavSafetyChecklistItem.findUnique({
           where: { id },
           select: { id: true },
         });
@@ -528,4 +609,3 @@ export class MasterDataService {
     };
   }
 }
-

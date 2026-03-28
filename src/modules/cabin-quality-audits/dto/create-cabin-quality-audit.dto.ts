@@ -87,6 +87,16 @@ export class CreateCabinQualityAuditDto {
   @IsUUID()
   shiftOccurrenceId?: string;
 
+  @ApiProperty()
+  @IsString()
+  @MaxLength(50)
+  shipNumber!: string;
+
+  @ApiProperty()
+  @IsString()
+  @MaxLength(50)
+  flightNumber!: string;
+
   @ApiProperty({ type: [CabinQualityAuditResponseInputDto] })
   @IsArray()
   @ArrayMinSize(1)
@@ -124,4 +134,3 @@ export class CreateCabinQualityAuditDto {
   @IsUUID('4', { each: true })
   generalPictureFileIds?: string[];
 }
-

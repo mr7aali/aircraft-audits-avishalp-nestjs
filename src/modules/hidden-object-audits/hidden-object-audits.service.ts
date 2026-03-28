@@ -601,6 +601,9 @@ export class HiddenObjectAuditsService {
       red: locations.filter(
         (location) => location.status === HiddenObjectLocationStatus.RED,
       ).length,
+      purple: locations.filter(
+        (location) => location.status === HiddenObjectLocationStatus.PURPLE,
+      ).length,
     };
   }
 

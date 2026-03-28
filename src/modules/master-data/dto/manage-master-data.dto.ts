@@ -252,6 +252,58 @@ export class UpdateAircraftTypeDto {
   isActive?: boolean;
 }
 
+export class CreateLavSafetyChecklistItemDto {
+  @ApiProperty()
+  @IsString()
+  @MaxLength(50)
+  code!: string;
+
+  @ApiProperty()
+  @IsString()
+  @MaxLength(120)
+  label!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(({ value }) => (value == null ? value : Number(value)))
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(toBoolean)
+  @IsBoolean()
+  isActive?: boolean;
+}
+
+export class UpdateLavSafetyChecklistItemDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  code?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  label?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(({ value }) => (value == null ? value : Number(value)))
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(toBoolean)
+  @IsBoolean()
+  isActive?: boolean;
+}
+
 export class CreateFleetAircraftDto {
   @ApiProperty()
   @IsString()

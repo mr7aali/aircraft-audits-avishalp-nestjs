@@ -17,6 +17,7 @@ import {
   CreateCleanTypeDto,
   CreateFleetAircraftDto,
   CreateGateDto,
+  CreateLavSafetyChecklistItemDto,
   CreateStationDto,
   MasterDataListQueryDto,
   UpdateAircraftSeatMapDto,
@@ -24,6 +25,7 @@ import {
   UpdateCleanTypeDto,
   UpdateFleetAircraftDto,
   UpdateGateDto,
+  UpdateLavSafetyChecklistItemDto,
   UpdateStationDto,
 } from './dto/manage-master-data.dto.js';
 import { MasterDataService } from './master-data.service.js';
@@ -36,7 +38,6 @@ export class MasterDataController {
   constructor(private readonly masterDataService: MasterDataService) {}
 
   @Get('clean-types')
-  @RequirePermission(MODULE_CODES.MASTER_DATA, 'list')
   getCleanTypes(@Query() query: MasterDataListQueryDto) {
     return this.masterDataService.getCleanTypes(query.includeInactive);
   }
@@ -60,13 +61,11 @@ export class MasterDataController {
   }
 
   @Get('aircraft-types')
-  @RequirePermission(MODULE_CODES.MASTER_DATA, 'list')
   getAircraftTypes(@Query() query: MasterDataListQueryDto) {
     return this.masterDataService.getAircraftTypes(query.includeInactive);
   }
 
   @Get('fleet-aircraft')
-  @RequirePermission(MODULE_CODES.MASTER_DATA, 'list')
   getFleetAircraft(@Query() query: MasterDataListQueryDto) {
     return this.masterDataService.getFleetAircraft(query.includeInactive);
   }
@@ -123,19 +122,39 @@ export class MasterDataController {
   }
 
   @Get('cabin-quality-checklist-items')
-  @RequirePermission(MODULE_CODES.MASTER_DATA, 'list')
   getCabinQualityChecklistItems() {
     return this.masterDataService.getCabinQualityChecklistItems();
   }
 
   @Get('lav-safety-checklist-items')
-  @RequirePermission(MODULE_CODES.MASTER_DATA, 'list')
-  getLavSafetyChecklistItems() {
-    return this.masterDataService.getLavSafetyChecklistItems();
+  getLavSafetyChecklistItems(@Query() query: MasterDataListQueryDto) {
+    return this.masterDataService.getLavSafetyChecklistItems(
+      query.includeInactive,
+    );
+  }
+
+  @Post('lav-safety-checklist-items')
+  @RequirePermission(MODULE_CODES.MASTER_DATA, 'create')
+  createLavSafetyChecklistItem(@Body() dto: CreateLavSafetyChecklistItemDto) {
+    return this.masterDataService.createLavSafetyChecklistItem(dto);
+  }
+
+  @Patch('lav-safety-checklist-items/:id')
+  @RequirePermission(MODULE_CODES.MASTER_DATA, 'create')
+  updateLavSafetyChecklistItem(
+    @Param('id') id: string,
+    @Body() dto: UpdateLavSafetyChecklistItemDto,
+  ) {
+    return this.masterDataService.updateLavSafetyChecklistItem(id, dto);
+  }
+
+  @Delete('lav-safety-checklist-items/:id')
+  @RequirePermission(MODULE_CODES.MASTER_DATA, 'create')
+  deleteLavSafetyChecklistItem(@Param('id') id: string) {
+    return this.masterDataService.deleteLavSafetyChecklistItem(id);
   }
 
   @Get('security-search-areas')
-  @RequirePermission(MODULE_CODES.MASTER_DATA, 'list')
   getSecuritySearchAreas() {
     return this.masterDataService.getSecuritySearchAreas();
   }
@@ -165,7 +184,6 @@ export class MasterDataController {
   }
 
   @Get('gates')
-  @RequirePermission(MODULE_CODES.MASTER_DATA, 'list')
   @ApiQuery({ name: 'stationId', required: true })
   getGates(@Query() query: MasterDataListQueryDto) {
     return this.masterDataService.getGates(

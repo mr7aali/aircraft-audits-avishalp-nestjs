@@ -16,7 +16,15 @@ const prisma = new PrismaClient({
 async function main() {
   const passwordHash = await argon2.hash('Password@123');
 
-  const roleCodes = ['VP', 'GM', 'DM', 'SUP', 'ALL', 'EMPLOYEE', 'HR_ADMIN'] as const;
+  const roleCodes = [
+    'VP',
+    'GM',
+    'DM',
+    'SUP',
+    'ALL',
+    'EMPLOYEE',
+    'HR_ADMIN',
+  ] as const;
   const roleNames: Record<(typeof roleCodes)[number], string> = {
     VP: 'Vice President',
     GM: 'General Manager',
@@ -61,7 +69,9 @@ async function main() {
       }),
     ),
   );
-  const moduleByCode = Object.fromEntries(modules.map((module) => [module.code, module]));
+  const moduleByCode = Object.fromEntries(
+    modules.map((module) => [module.code, module]),
+  );
 
   const fullOpsRoles = ['VP', 'GM', 'DM', 'SUP', 'ALL'];
   for (const roleCode of fullOpsRoles) {
@@ -180,8 +190,18 @@ async function main() {
 
   const stations = await Promise.all(
     [
-      { code: 'JFK', airportCode: 'JFK', name: 'John F. Kennedy', timezone: 'America/New_York' },
-      { code: 'LAX', airportCode: 'LAX', name: 'Los Angeles Intl', timezone: 'America/Los_Angeles' },
+      {
+        code: 'JFK',
+        airportCode: 'JFK',
+        name: 'John F. Kennedy',
+        timezone: 'America/New_York',
+      },
+      {
+        code: 'LAX',
+        airportCode: 'LAX',
+        name: 'Los Angeles Intl',
+        timezone: 'America/Los_Angeles',
+      },
     ].map((station) =>
       prisma.station.upsert({
         where: { code: station.code },
@@ -190,7 +210,9 @@ async function main() {
       }),
     ),
   );
-  const stationByCode = Object.fromEntries(stations.map((station) => [station.code, station]));
+  const stationByCode = Object.fromEntries(
+    stations.map((station) => [station.code, station]),
+  );
 
   for (const station of stations) {
     for (const gateCode of ['A1', 'A2', 'B1']) {
@@ -243,16 +265,18 @@ async function main() {
         name,
         sortOrder: index + 1,
         isActive: true,
-        seatMapJson:
-          DEFAULT_AIRCRAFT_SEAT_MAPS[code] as unknown as Prisma.InputJsonValue,
+        seatMapJson: DEFAULT_AIRCRAFT_SEAT_MAPS[
+          code
+        ] as unknown as Prisma.InputJsonValue,
       },
       create: {
         code,
         name,
         sortOrder: index + 1,
         isActive: true,
-        seatMapJson:
-          DEFAULT_AIRCRAFT_SEAT_MAPS[code] as unknown as Prisma.InputJsonValue,
+        seatMapJson: DEFAULT_AIRCRAFT_SEAT_MAPS[
+          code
+        ] as unknown as Prisma.InputJsonValue,
       },
     });
   }
@@ -307,6 +331,7 @@ async function main() {
     'Seat Back Trash',
     'Tray Tables',
     'IFE Screens',
+    'Life vest seal',
   ];
   for (const [index, label] of cabinChecklist.entries()) {
     const code = label.toUpperCase().replace(/[^A-Z0-9]+/g, '_');
@@ -530,11 +555,17 @@ async function main() {
 
   // Optional chat sample.
   const sampleConversation = await prisma.chatConversation.upsert({
-    where: { directPairKey: [userByUid['sup.user'].id, userByUid['employee.user'].id].sort().join(':') },
+    where: {
+      directPairKey: [userByUid['sup.user'].id, userByUid['employee.user'].id]
+        .sort()
+        .join(':'),
+    },
     update: {},
     create: {
       conversationType: 'DIRECT',
-      directPairKey: [userByUid['sup.user'].id, userByUid['employee.user'].id].sort().join(':'),
+      directPairKey: [userByUid['sup.user'].id, userByUid['employee.user'].id]
+        .sort()
+        .join(':'),
       createdByUserId: userByUid['sup.user'].id,
       participants: {
         create: [
@@ -574,4 +605,3 @@ main()
     await prisma.$disconnect();
     process.exit(1);
   });
-

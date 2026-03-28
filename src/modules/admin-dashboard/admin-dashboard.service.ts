@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '../../generated/prisma-client/client.js';
 import {
   HiddenObjectAuditStatus,
@@ -11,6 +15,7 @@ import { AuthenticatedUser } from '../../common/types/authenticated-user.type.js
 import { PrismaService } from '../../prisma/prisma.service.js';
 import {
   AdminAuditType,
+  AdminDashboardAuditDetailQueryDto,
   AdminDashboardAuditRecordsQueryDto,
   AdminDashboardOverviewQueryDto,
 } from './dto/admin-dashboard-query.dto.js';
@@ -129,10 +134,14 @@ export class AdminDashboardService {
       compliance: {
         overallScore: this.averageScore(records.map((item) => item.score)),
         cabinQualityScore: this.averageScore(
-          cabinQuality.map((item) => this.scoreCabinQuality(item.responses).score),
+          cabinQuality.map(
+            (item) => this.scoreCabinQuality(item.responses).score,
+          ),
         ),
         cabinSecurityScore: this.averageScore(
-          cabinSecurity.map((item) => this.scoreCabinSecurity(item.results).score),
+          cabinSecurity.map(
+            (item) => this.scoreCabinSecurity(item.results).score,
+          ),
         ),
         hiddenObjectScore: this.averageScore(
           hiddenObject.map((item) => this.scoreHiddenObject(item).score),
@@ -203,23 +212,195 @@ export class AdminDashboardService {
     }
 
     const normalizedSearch = query.search?.trim().toLowerCase();
-    const filtered = (normalizedSearch
-      ? records.filter((item) =>
-          [
-            item.title,
-            item.auditorName,
-            item.gateCode,
-            item.summary,
-            item.status,
-          ].some((value) => value.toLowerCase().includes(normalizedSearch)),
-        )
-      : records
+    const filtered = (
+      normalizedSearch
+        ? records.filter((item) =>
+            [
+              item.title,
+              item.auditorName,
+              item.gateCode,
+              item.summary,
+              item.status,
+            ].some((value) => value.toLowerCase().includes(normalizedSearch)),
+          )
+        : records
     ).sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime());
 
     const start = (query.page - 1) * query.limit;
     const pageItems = filtered.slice(start, start + query.limit);
 
     return buildPaginatedResult(pageItems, filtered.length, query);
+  }
+
+  async getAuditDetail(
+    user: AuthenticatedUser,
+    query: AdminDashboardAuditDetailQueryDto,
+  ) {
+    const stationId = this.getStationId(user);
+
+    switch (query.type) {
+      case AdminAuditType.CABIN_QUALITY: {
+        const audit = await this.prisma.cabinQualityAudit.findFirst({
+          where: {
+            id: query.id,
+            stationId,
+          },
+          include: {
+            responses: {
+              include: {
+                checklistItem: true,
+                files: {
+                  include: { file: true },
+                  orderBy: { sortOrder: 'asc' },
+                },
+              },
+              orderBy: { checklistItem: { sortOrder: 'asc' } },
+            },
+            files: {
+              include: { file: true },
+              orderBy: { sortOrder: 'asc' },
+            },
+          },
+        });
+
+        if (!audit) {
+          throw new NotFoundException('Cabin quality audit not found');
+        }
+
+        return audit;
+      }
+
+      case AdminAuditType.CABIN_SECURITY: {
+        const training =
+          await this.prisma.cabinSecuritySearchTraining.findFirst({
+            where: {
+              id: query.id,
+              stationId,
+            },
+            include: {
+              results: {
+                include: {
+                  area: true,
+                  files: {
+                    include: { file: true },
+                    orderBy: { sortOrder: 'asc' },
+                  },
+                },
+              },
+              files: {
+                include: { file: true },
+                orderBy: { sortOrder: 'asc' },
+              },
+            },
+          });
+
+        if (!training) {
+          throw new NotFoundException(
+            'Cabin security search training not found',
+          );
+        }
+
+        return training;
+      }
+
+      case AdminAuditType.HIDDEN_OBJECT: {
+        const session = await this.prisma.hiddenObjectAuditSession.findFirst({
+          where: {
+            id: query.id,
+            stationId,
+          },
+          include: {
+            aircraftType: true,
+            fleetAircraft: {
+              include: {
+                aircraftType: true,
+              },
+            },
+            locations: {
+              include: {
+                files: {
+                  orderBy: { sortOrder: 'asc' },
+                },
+              },
+              orderBy: [{ sectionLabel: 'asc' }, { locationCode: 'asc' }],
+            },
+          },
+        });
+
+        if (!session) {
+          throw new NotFoundException('Hidden object audit not found');
+        }
+
+        return {
+          id: session.id,
+          sessionAt: session.sessionAt,
+          status: session.status,
+          setupCompletedAt: session.setupCompletedAt,
+          activatedAt: session.activatedAt,
+          closedAt: session.closedAt,
+          shipNumber: session.shipNumberSnapshot,
+          aircraftType: {
+            id: session.aircraftTypeId,
+            name: session.aircraftTypeNameSnapshot,
+            seatMap: session.aircraftType.seatMapJson ?? null,
+          },
+          fleetAircraft: {
+            id: session.fleetAircraft.id,
+            shipNumber: session.fleetAircraft.shipNumber,
+            displayName: session.fleetAircraft.displayName,
+          },
+          auditor: {
+            name: session.auditorNameSnapshot,
+            role: session.auditorRoleSnapshot,
+          },
+          objectsToHideCount: session.objectsToHideCount,
+          locations: session.locations.map((location) => ({
+            id: location.id,
+            locationCode: location.locationCode,
+            locationLabel: location.locationLabel,
+            sectionLabel: location.sectionLabel,
+            locationType: location.locationType,
+            status: location.status,
+            subLocation: location.subLocation,
+            hiddenConfirmedAt: location.hiddenConfirmedAt,
+            foundAt: location.foundAt,
+            foundByName: location.foundByNameSnapshot,
+            photoFileIds: location.files.map((entry) => entry.fileId),
+          })),
+        };
+      }
+
+      case AdminAuditType.LAV_SAFETY: {
+        const observation = await this.prisma.lavSafetyObservation.findFirst({
+          where: {
+            id: query.id,
+            stationId,
+          },
+          include: {
+            responses: {
+              include: {
+                checklistItem: true,
+                files: {
+                  include: { file: true },
+                  orderBy: { sortOrder: 'asc' },
+                },
+              },
+              orderBy: { checklistItem: { sortOrder: 'asc' } },
+            },
+            files: {
+              include: { file: true },
+              orderBy: { sortOrder: 'asc' },
+            },
+          },
+        });
+
+        if (!observation) {
+          throw new NotFoundException('LAV safety observation not found');
+        }
+
+        return observation;
+      }
+    }
   }
 
   private getStationId(user: AuthenticatedUser) {
@@ -301,16 +482,14 @@ export class AdminDashboardService {
     };
   }
 
-  private toCabinQualityRecord(
-    item: {
-      id: string;
-      auditAt: Date;
-      auditorNameSnapshot: string;
-      gateCodeSnapshot: string;
-      cleanTypeSnapshot: string;
-      responses: { response: YesNoNa }[];
-    },
-  ): AuditRecordItem {
+  private toCabinQualityRecord(item: {
+    id: string;
+    auditAt: Date;
+    auditorNameSnapshot: string;
+    gateCodeSnapshot: string;
+    cleanTypeSnapshot: string;
+    responses: { response: YesNoNa }[];
+  }): AuditRecordItem {
     const result = this.scoreCabinQuality(item.responses);
     return {
       id: item.id,
@@ -325,16 +504,14 @@ export class AdminDashboardService {
     };
   }
 
-  private toCabinSecurityRecord(
-    item: {
-      id: string;
-      trainingAt: Date;
-      auditorNameSnapshot: string;
-      gateCodeSnapshot: string;
-      shipNumber: string;
-      results: { result: PassFail }[];
-    },
-  ): AuditRecordItem {
+  private toCabinSecurityRecord(item: {
+    id: string;
+    trainingAt: Date;
+    auditorNameSnapshot: string;
+    gateCodeSnapshot: string;
+    shipNumber: string;
+    results: { result: PassFail }[];
+  }): AuditRecordItem {
     const result = this.scoreCabinSecurity(item.results);
     return {
       id: item.id,
@@ -349,17 +526,15 @@ export class AdminDashboardService {
     };
   }
 
-  private toHiddenObjectRecord(
-    item: {
-      id: string;
-      sessionAt: Date;
-      status: HiddenObjectAuditStatus;
-      auditorNameSnapshot: string;
-      shipNumberSnapshot: string;
-      aircraftTypeNameSnapshot: string;
-      locations: { status: HiddenObjectLocationStatus }[];
-    },
-  ): AuditRecordItem {
+  private toHiddenObjectRecord(item: {
+    id: string;
+    sessionAt: Date;
+    status: HiddenObjectAuditStatus;
+    auditorNameSnapshot: string;
+    shipNumberSnapshot: string;
+    aircraftTypeNameSnapshot: string;
+    locations: { status: HiddenObjectLocationStatus }[];
+  }): AuditRecordItem {
     const result = this.scoreHiddenObject(item);
     return {
       id: item.id,
@@ -374,16 +549,14 @@ export class AdminDashboardService {
     };
   }
 
-  private toLavSafetyRecord(
-    item: {
-      id: string;
-      observedAt: Date;
-      auditorNameSnapshot: string;
-      gateCodeSnapshot: string;
-      driverName: string;
-      responses: { response: PassFail }[];
-    },
-  ): AuditRecordItem {
+  private toLavSafetyRecord(item: {
+    id: string;
+    observedAt: Date;
+    auditorNameSnapshot: string;
+    gateCodeSnapshot: string;
+    driverName: string;
+    responses: { response: PassFail }[];
+  }): AuditRecordItem {
     const result = this.scoreLavSafety(item.responses);
     return {
       id: item.id,
@@ -398,12 +571,17 @@ export class AdminDashboardService {
     };
   }
 
-  private scoreCabinQuality(
-    responses: { response: YesNoNa }[],
-  ): { score: number; status: 'PASS' | 'FAIL' } {
+  private scoreCabinQuality(responses: { response: YesNoNa }[]): {
+    score: number;
+    status: 'PASS' | 'FAIL';
+  } {
     const applicable = responses.filter((item) => item.response !== YesNoNa.NA);
-    const passed = applicable.filter((item) => item.response === YesNoNa.YES).length;
-    const failed = applicable.filter((item) => item.response === YesNoNa.NO).length;
+    const passed = applicable.filter(
+      (item) => item.response === YesNoNa.YES,
+    ).length;
+    const failed = applicable.filter(
+      (item) => item.response === YesNoNa.NO,
+    ).length;
     const status: 'PASS' | 'FAIL' = failed > 0 ? 'FAIL' : 'PASS';
     return {
       score:
@@ -414,11 +592,16 @@ export class AdminDashboardService {
     };
   }
 
-  private scoreCabinSecurity(
-    results: { result: PassFail }[],
-  ): { score: number; status: 'PASS' | 'FAIL' } {
-    const passed = results.filter((item) => item.result === PassFail.PASS).length;
-    const failed = results.filter((item) => item.result === PassFail.FAIL).length;
+  private scoreCabinSecurity(results: { result: PassFail }[]): {
+    score: number;
+    status: 'PASS' | 'FAIL';
+  } {
+    const passed = results.filter(
+      (item) => item.result === PassFail.PASS,
+    ).length;
+    const failed = results.filter(
+      (item) => item.result === PassFail.FAIL,
+    ).length;
     const total = passed + failed;
     const status: 'PASS' | 'FAIL' = failed > 0 ? 'FAIL' : 'PASS';
     return {
@@ -427,11 +610,16 @@ export class AdminDashboardService {
     };
   }
 
-  private scoreLavSafety(
-    responses: { response: PassFail }[],
-  ): { score: number; status: 'PASS' | 'FAIL' } {
-    const passed = responses.filter((item) => item.response === PassFail.PASS).length;
-    const failed = responses.filter((item) => item.response === PassFail.FAIL).length;
+  private scoreLavSafety(responses: { response: PassFail }[]): {
+    score: number;
+    status: 'PASS' | 'FAIL';
+  } {
+    const passed = responses.filter(
+      (item) => item.response === PassFail.PASS,
+    ).length;
+    const failed = responses.filter(
+      (item) => item.response === PassFail.FAIL,
+    ).length;
     const total = passed + failed;
     const status: 'PASS' | 'FAIL' = failed > 0 ? 'FAIL' : 'PASS';
     return {
@@ -454,7 +642,11 @@ export class AdminDashboardService {
     const notFound = item.locations.filter(
       (location) => location.status === HiddenObjectLocationStatus.RED,
     ).length;
-    const total = item.locations.length;
+    const total = item.locations.filter(
+      (location) =>
+        location.status === HiddenObjectLocationStatus.GREEN ||
+        location.status === HiddenObjectLocationStatus.RED,
+    ).length;
     const finalStatus: 'PASS' | 'FAIL' = notFound > 0 ? 'FAIL' : 'PASS';
     const displayStatus =
       item.status === HiddenObjectAuditStatus.CLOSED
@@ -480,4 +672,3 @@ export class AdminDashboardService {
     );
   }
 }
-

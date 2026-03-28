@@ -1,5 +1,11 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  IsDateString,
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto.js';
 
 export enum AdminAuditType {
@@ -46,4 +52,14 @@ export class AdminDashboardAuditRecordsQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsString()
   search?: string;
+}
+
+export class AdminDashboardAuditDetailQueryDto {
+  @ApiPropertyOptional({ enum: AdminAuditType })
+  @IsEnum(AdminAuditType)
+  type!: AdminAuditType;
+
+  @ApiPropertyOptional()
+  @IsUUID()
+  id!: string;
 }

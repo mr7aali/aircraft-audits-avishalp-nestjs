@@ -108,7 +108,7 @@ export class CabinQualityAuditsService {
           cleanTypeSnapshot: cleanType.name,
           detailedResultsJson,
           otherFindings: dto.otherFindings,
-          additionalNotes: dto.additionalNotes,
+          additionalNotes: this.buildStoredAdditionalNotes(dto),
           signatureFileId: dto.signatureFileId,
           status: 'SUBMITTED',
           submittedAt: new Date(),
@@ -155,8 +155,10 @@ export class CabinQualityAuditsService {
     if (!user.activeStationId) {
       throw new ForbiddenException('Active station is required');
     }
+
     const where: Prisma.CabinQualityAuditWhereInput = {
       stationId: user.activeStationId,
+      auditorUserId: user.id,
       ...(query.fromDate || query.toDate
         ? {
             auditAt: {
@@ -200,6 +202,7 @@ export class CabinQualityAuditsService {
 
     return buildPaginatedResult(
       items.map((item) => ({
+        ...this.parseAuditMetadata(item.additionalNotes),
         id: item.id,
         auditAt: item.auditAt,
         auditorName: item.auditorNameSnapshot,
@@ -218,10 +221,12 @@ export class CabinQualityAuditsService {
     if (!user.activeStationId) {
       throw new ForbiddenException('Active station is required');
     }
+
     const audit = await this.prisma.cabinQualityAudit.findFirst({
       where: {
         id,
         stationId: user.activeStationId,
+        auditorUserId: user.id,
       },
       include: {
         responses: {
@@ -242,7 +247,44 @@ export class CabinQualityAuditsService {
       throw new NotFoundException('Cabin quality audit not found');
     }
 
-    return audit;
+    return {
+      ...audit,
+      ...this.parseAuditMetadata(audit.additionalNotes),
+    };
+  }
+
+  private buildStoredAdditionalNotes(dto: CreateCabinQualityAuditDto) {
+    const metadataLines = [
+      `Ship Number: ${dto.shipNumber.trim()}`,
+      `Flight Number: ${dto.flightNumber.trim()}`,
+    ];
+
+    const noteBody = dto.additionalNotes?.trim() ?? '';
+    const noteSegments =
+      noteBody.length > 0 ? [...metadataLines, noteBody] : metadataLines;
+
+    const combined = noteSegments.join('\n');
+    return combined.length === 0 ? null : combined;
+  }
+
+  private parseAuditMetadata(additionalNotes?: string | null) {
+    let shipNumber = '';
+    let flightNumber = '';
+
+    for (const rawLine of (additionalNotes ?? '').split('\n')) {
+      const line = rawLine.trim();
+      if (line.startsWith('Ship Number:')) {
+        shipNumber = line.substring('Ship Number:'.length).trim();
+        continue;
+      }
+      if (line.startsWith('Flight Number:')) {
+        flightNumber = line.substring('Flight Number:'.length).trim();
+      }
+    }
+
+    return {
+      shipNumber,
+      flightNumber,
+    };
   }
 }
-

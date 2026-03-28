@@ -135,6 +135,7 @@ export class LavSafetyObservationsService {
     }
     const where: Prisma.LavSafetyObservationWhereInput = {
       stationId: user.activeStationId,
+      auditorUserId: user.id,
       ...(query.fromDate || query.toDate
         ? {
             observedAt: {
@@ -202,6 +203,7 @@ export class LavSafetyObservationsService {
       where: {
         id,
         stationId: user.activeStationId,
+        auditorUserId: user.id,
       },
       include: {
         responses: {
@@ -223,4 +225,3 @@ export class LavSafetyObservationsService {
     return observation;
   }
 }
-
