@@ -1,20 +1,9 @@
-import {
-  Controller,
-  Get,
-  Param,
-  Post,
-  UploadedFile,
-  UseInterceptors,
-  Body,
-  Res,
-} from '@nestjs/common';
-import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
-import { FileInterceptor } from '@nestjs/platform-express';
-import multer from 'multer';
+import { Body, Controller, Get, Param, Post, Res } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { AuthenticatedUser } from '../../common/types/authenticated-user.type.js';
-import { UploadFileDto } from './dto/upload-file.dto.js';
+import { RegisterCloudinaryFileDto } from './dto/register-cloudinary-file.dto.js';
 import { FilesService } from './files.service.js';
 
 @ApiTags('Files')
@@ -23,22 +12,12 @@ import { FilesService } from './files.service.js';
 export class FilesController {
   constructor(private readonly filesService: FilesService) {}
 
-  @Post('upload')
-  @ApiConsumes('multipart/form-data')
-  @UseInterceptors(
-    FileInterceptor('file', {
-      storage: multer.memoryStorage(),
-      limits: {
-        fileSize: 104857600,
-      },
-    }),
-  )
-  upload(
-    @UploadedFile() file: Express.Multer.File,
-    @Body() dto: UploadFileDto,
+  @Post('register')
+  registerCloudinaryFile(
+    @Body() dto: RegisterCloudinaryFileDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.filesService.upload(file, dto, user);
+    return this.filesService.registerCloudinaryFile(dto, user);
   }
 
   @Get(':id')
