@@ -8,6 +8,7 @@ import { Prisma } from '../../generated/prisma-client/client.js';
 import {
   HiddenObjectAuditStatus,
   HiddenObjectLocationStatus,
+  HiddenObjectLocationType,
   PassFail,
 } from '../../generated/prisma-client/enums.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
@@ -29,6 +30,31 @@ type ResolvedSecuritySearchArea = {
 type ResolvedAreaEntry = {
   area: ResolvedSecuritySearchArea;
   result: CreateCabinSecuritySearchTrainingDto['areaResults'][number];
+};
+
+type SeatMapSection = {
+  name?: unknown;
+  areaType?: unknown;
+  startRow?: unknown;
+  endRow?: unknown;
+  leftCols?: unknown;
+  rightCols?: unknown;
+  skipRows?: unknown;
+  amenitiesBefore?: unknown;
+  amenitiesAfter?: unknown;
+};
+
+type SeatMapAmenity = {
+  leftId?: unknown;
+  rightId?: unknown;
+  customLabel?: unknown;
+};
+
+type HiddenObjectLocationCandidate = {
+  locationCode: string;
+  locationLabel: string;
+  sectionLabel: string;
+  locationType: HiddenObjectLocationType;
 };
 
 @Injectable()
@@ -78,6 +104,11 @@ export class CabinSecuritySearchTrainingsService {
               id: true,
               status: true,
               shipNumberSnapshot: true,
+              aircraftType: {
+                select: {
+                  seatMapJson: true,
+                },
+              },
             },
           })
         : Promise.resolve(null),
@@ -216,6 +247,10 @@ export class CabinSecuritySearchTrainingsService {
           },
           select: {
             id: true,
+            locationCode: true,
+            locationLabel: true,
+            sectionLabel: true,
+            locationType: true,
           },
         });
 
@@ -285,6 +320,76 @@ export class CabinSecuritySearchTrainingsService {
           }
         }
 
+        const activeAreaNames = new Set(
+          activeLocations.map((location) =>
+            this.normalizeAreaLabel(this.buildHiddenObjectAreaName(location)),
+          ),
+        );
+        const activeLocationCodes = new Set(
+          activeLocations.map((location) =>
+            location.locationCode.trim().toUpperCase(),
+          ),
+        );
+        const candidateByAreaName =
+          this.buildHiddenObjectCandidateMapByAreaName(
+            hiddenObjectAudit.aircraftType?.seatMapJson ?? null,
+          );
+        const unexpectedFoundEntries = resolvedAreaEntries.filter((entry) => {
+          if (entry.result.result !== PassFail.PASS) {
+            return false;
+          }
+
+          const normalizedAreaName = this.normalizeAreaLabel(entry.area.label);
+          if (activeAreaNames.has(normalizedAreaName)) {
+            return false;
+          }
+
+          const candidate = candidateByAreaName.get(normalizedAreaName);
+          if (!candidate) {
+            return false;
+          }
+
+          return !activeLocationCodes.has(
+            candidate.locationCode.trim().toUpperCase(),
+          );
+        });
+
+        for (const entry of unexpectedFoundEntries) {
+          const candidate = candidateByAreaName.get(
+            this.normalizeAreaLabel(entry.area.label),
+          );
+          if (!candidate) {
+            continue;
+          }
+
+          const createdLocation = await tx.hiddenObjectAuditLocation.create({
+            data: {
+              sessionId: hiddenObjectAudit.id,
+              locationCode: candidate.locationCode,
+              locationLabel: candidate.locationLabel,
+              sectionLabel: candidate.sectionLabel,
+              locationType: candidate.locationType,
+              status: HiddenObjectLocationStatus.PURPLE,
+              foundAt: now,
+              foundByUserId: user.id,
+              foundByNameSnapshot: `${stationAccess.user.firstName} ${stationAccess.user.lastName}`,
+            },
+            select: {
+              id: true,
+            },
+          });
+
+          if (entry.result.imageFileIds?.length) {
+            await tx.hiddenObjectAuditLocationFile.createMany({
+              data: entry.result.imageFileIds.map((fileId, index) => ({
+                locationId: createdLocation.id,
+                fileId,
+                sortOrder: index,
+              })),
+            });
+          }
+        }
+
         await tx.hiddenObjectAuditLocation.updateMany({
           where: {
             sessionId: hiddenObjectAudit.id,
@@ -317,9 +422,11 @@ export class CabinSecuritySearchTrainingsService {
     if (!user.activeStationId) {
       throw new ForbiddenException('Active station is required');
     }
+
     const selectedResults = this.normalizeSelectedResults(query);
     const where: Prisma.CabinSecuritySearchTrainingWhereInput = {
       stationId: user.activeStationId,
+      auditorUserId: user.id,
       ...(query.fromDate || query.toDate
         ? {
             trainingAt: {
@@ -375,10 +482,12 @@ export class CabinSecuritySearchTrainingsService {
     if (!user.activeStationId) {
       throw new ForbiddenException('Active station is required');
     }
+
     const training = await this.prisma.cabinSecuritySearchTraining.findFirst({
       where: {
         id,
         stationId: user.activeStationId,
+        auditorUserId: user.id,
       },
       include: {
         results: {
@@ -464,5 +573,304 @@ export class CabinSecuritySearchTrainingsService {
 
   private normalizeShipNumber(value: string): string {
     return value.trim().toUpperCase();
+  }
+
+  private normalizeAreaLabel(value: string): string {
+    return value.trim().toLowerCase();
+  }
+
+  private buildHiddenObjectCandidateMapByAreaName(
+    seatMapJson: Prisma.JsonValue | null,
+  ) {
+    const candidates = this.extractHiddenObjectCandidates(seatMapJson);
+    return new Map(
+      candidates.map((candidate) => [
+        this.normalizeAreaLabel(this.buildHiddenObjectAreaName(candidate)),
+        candidate,
+      ]),
+    );
+  }
+
+  private buildHiddenObjectAreaName(location: {
+    locationCode: string;
+    locationLabel: string;
+    sectionLabel: string;
+  }) {
+    const locationCode = location.locationCode.trim();
+    const upperLocationCode = locationCode.toUpperCase();
+
+    const isSeatMapAddressable =
+      /^\d+[A-Z]+$/i.test(locationCode) ||
+      upperLocationCode.startsWith('LAV') ||
+      upperLocationCode.startsWith('GALLEY') ||
+      upperLocationCode.startsWith('JUMP SEAT') ||
+      upperLocationCode === 'CLOSET';
+
+    if (isSeatMapAddressable) {
+      if (/^\d+[A-Z]+$/i.test(locationCode)) {
+        return `Seat ${upperLocationCode}`;
+      }
+
+      return this.buildCabinSecurityAreaLabel(locationCode);
+    }
+
+    return location.locationLabel.trim() || location.sectionLabel.trim();
+  }
+
+  private buildCabinSecurityAreaLabel(locationCode: string) {
+    const upperLocationCode = locationCode.trim().toUpperCase();
+
+    if (upperLocationCode.startsWith('LAV') || upperLocationCode === 'CLOSET') {
+      if (upperLocationCode.includes('FWD')) {
+        return 'FWD LAV';
+      }
+      if (upperLocationCode.includes('MID L')) {
+        return 'MID LAV L';
+      }
+      if (upperLocationCode.includes('MID R')) {
+        return 'MID LAV R';
+      }
+      if (upperLocationCode.includes('AFT L')) {
+        return 'AFT LAV L';
+      }
+      if (upperLocationCode.includes('AFT R')) {
+        return 'AFT LAV R';
+      }
+      return locationCode.trim();
+    }
+
+    if (upperLocationCode.startsWith('GALLEY')) {
+      return upperLocationCode.includes('FWD') ? 'Front Galley' : 'Rear Galley';
+    }
+
+    return locationCode.trim();
+  }
+
+  private extractHiddenObjectCandidates(seatMapJson: Prisma.JsonValue | null) {
+    if (
+      !seatMapJson ||
+      typeof seatMapJson !== 'object' ||
+      Array.isArray(seatMapJson)
+    ) {
+      return [] as HiddenObjectLocationCandidate[];
+    }
+
+    const rawSections = Array.isArray(
+      (seatMapJson as Record<string, unknown>).sections,
+    )
+      ? ((seatMapJson as Record<string, unknown>).sections as SeatMapSection[])
+      : [];
+    if (!rawSections.length) {
+      return [] as HiddenObjectLocationCandidate[];
+    }
+
+    const candidates: HiddenObjectLocationCandidate[] = [];
+    const seen = new Set<string>();
+
+    for (const rawSection of rawSections) {
+      const sectionLabel =
+        this.asString(rawSection.name) ||
+        this.deriveSectionLabelFromAreaType(
+          this.asString(rawSection.areaType),
+        ) ||
+        'Cabin Section';
+      const startRow = this.asInt(rawSection.startRow);
+      const endRow = this.asInt(rawSection.endRow);
+      const leftCols = this.asStringList(rawSection.leftCols);
+      const rightCols = this.asStringList(rawSection.rightCols);
+      const skipRows = new Set(this.asIntList(rawSection.skipRows));
+
+      this.appendAmenityCandidates(
+        rawSection.amenitiesBefore,
+        sectionLabel,
+        candidates,
+        seen,
+      );
+
+      const hasSeatRows =
+        startRow != null &&
+        endRow != null &&
+        startRow > 0 &&
+        endRow >= startRow &&
+        (leftCols.length > 0 || rightCols.length > 0);
+
+      if (hasSeatRows) {
+        for (let row = startRow; row <= endRow; row += 1) {
+          if (skipRows.has(row)) {
+            continue;
+          }
+
+          for (const col of [...leftCols, ...rightCols]) {
+            this.pushHiddenObjectCandidate(
+              {
+                locationCode: `${row}${col}`,
+                locationLabel: `Seat ${row}${col}`,
+                sectionLabel,
+                locationType: HiddenObjectLocationType.SEAT,
+              },
+              candidates,
+              seen,
+            );
+          }
+        }
+      }
+
+      this.appendAmenityCandidates(
+        rawSection.amenitiesAfter,
+        sectionLabel,
+        candidates,
+        seen,
+      );
+    }
+
+    return candidates;
+  }
+
+  private appendAmenityCandidates(
+    rawAmenities: unknown,
+    fallbackSectionLabel: string,
+    candidates: HiddenObjectLocationCandidate[],
+    seen: Set<string>,
+  ) {
+    if (!Array.isArray(rawAmenities)) {
+      return;
+    }
+
+    for (const rawAmenity of rawAmenities as SeatMapAmenity[]) {
+      const locationIds = [
+        this.asString(rawAmenity.leftId),
+        this.asString(rawAmenity.rightId),
+        this.asString(rawAmenity.customLabel),
+      ].filter((value): value is string => Boolean(value));
+
+      for (const locationCode of locationIds) {
+        const locationType = this.inferHiddenObjectLocationType(locationCode);
+        this.pushHiddenObjectCandidate(
+          {
+            locationCode,
+            locationLabel: this.formatZoneLabel(locationCode),
+            sectionLabel:
+              this.deriveAmenitySectionLabel(locationCode) ||
+              fallbackSectionLabel,
+            locationType,
+          },
+          candidates,
+          seen,
+        );
+      }
+    }
+  }
+
+  private pushHiddenObjectCandidate(
+    candidate: HiddenObjectLocationCandidate,
+    candidates: HiddenObjectLocationCandidate[],
+    seen: Set<string>,
+  ) {
+    const key = candidate.locationCode.trim().toUpperCase();
+    if (!key || seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    candidates.push(candidate);
+  }
+
+  private inferHiddenObjectLocationType(locationCode: string) {
+    if (/^\d+[A-Z]+$/i.test(locationCode.trim())) {
+      return HiddenObjectLocationType.SEAT;
+    }
+
+    const normalized = locationCode.trim().toLowerCase();
+    if (normalized.includes('galley')) {
+      return HiddenObjectLocationType.GALLEY;
+    }
+    if (normalized.includes('lav')) {
+      return HiddenObjectLocationType.LAV;
+    }
+    if (normalized.includes('jump')) {
+      return HiddenObjectLocationType.JUMP_SEAT;
+    }
+
+    return HiddenObjectLocationType.ZONE;
+  }
+
+  private deriveSectionLabelFromAreaType(areaType?: string | null) {
+    switch ((areaType ?? '').trim().toLowerCase()) {
+      case 'first_class':
+        return 'First Class';
+      case 'comfort':
+        return 'Comfort+';
+      case 'main_cabin':
+        return 'Main Cabin';
+      default:
+        return null;
+    }
+  }
+
+  private deriveAmenitySectionLabel(locationCode: string) {
+    const normalized = locationCode.trim().toLowerCase();
+    if (normalized.includes('galley')) {
+      return normalized.includes('aft')
+        ? 'Rear Galley'
+        : normalized.includes('fwd')
+          ? 'Front Galley'
+          : 'Galley';
+    }
+    if (normalized.includes('lav')) {
+      if (normalized.includes('aft')) {
+        return 'Aft Lav';
+      }
+      if (normalized.includes('mid')) {
+        return 'Mid Lav';
+      }
+      if (normalized.includes('fwd')) {
+        return 'Forward Lav';
+      }
+      return 'Lav';
+    }
+
+    return null;
+  }
+
+  private formatZoneLabel(locationCode: string) {
+    return locationCode.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  private asString(value: unknown) {
+    const normalized = value?.toString().trim();
+    return normalized ? normalized : null;
+  }
+
+  private asStringList(value: unknown) {
+    if (!Array.isArray(value)) {
+      return [] as string[];
+    }
+
+    return value
+      .map((entry) => entry?.toString().trim().toUpperCase())
+      .filter((entry): entry is string => Boolean(entry));
+  }
+
+  private asInt(value: unknown) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return Math.trunc(value);
+    }
+
+    if (typeof value === 'string' && value.trim().length > 0) {
+      const parsed = Number.parseInt(value, 10);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    return null;
+  }
+
+  private asIntList(value: unknown) {
+    if (!Array.isArray(value)) {
+      return [] as number[];
+    }
+
+    return value
+      .map((entry) => this.asInt(entry))
+      .filter((entry): entry is number => entry != null);
   }
 }

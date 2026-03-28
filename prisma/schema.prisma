@@ -1017,6 +1017,7 @@ enum HiddenObjectLocationStatus {
   BLUE
   GREEN
   RED
+  PURPLE
 }
 
 enum HiddenObjectLocationType {

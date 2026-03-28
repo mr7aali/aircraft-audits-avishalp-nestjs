@@ -4,6 +4,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { RequireActiveStation } from '../../common/decorators/require-active-station.decorator.js';
 import { AuthenticatedUser } from '../../common/types/authenticated-user.type.js';
 import {
+  AdminDashboardAuditDetailQueryDto,
   AdminDashboardAuditRecordsQueryDto,
   AdminDashboardOverviewQueryDto,
 } from './dto/admin-dashboard-query.dto.js';
@@ -30,5 +31,13 @@ export class AdminDashboardController {
     @Query() query: AdminDashboardAuditRecordsQueryDto,
   ) {
     return this.adminDashboardService.getAuditRecords(user, query);
+  }
+
+  @Get('audit-detail')
+  getAuditDetail(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: AdminDashboardAuditDetailQueryDto,
+  ) {
+    return this.adminDashboardService.getAuditDetail(user, query);
   }
 }
