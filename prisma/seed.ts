@@ -343,24 +343,80 @@ async function main() {
   }
 
   const lavChecklist = [
-    'Used Chocks',
-    'Safety Stop',
-    'Used Guide Cone',
-    'Face Mask',
-    'Gloves',
-    'Shoes',
-    'Dump',
-    'Flush',
-    'Fill',
-    '360 Walk Around',
-    'Chock Removal Process',
+    {
+      label: 'Used Chocks',
+      description:
+        'Confirm wheel chocks are positioned correctly before servicing begins.',
+    },
+    {
+      label: 'Safety Stop',
+      description:
+        'Verify the lavatory truck safety stop is engaged and stable during servicing.',
+    },
+    {
+      label: 'Used Guide Cone',
+      description:
+        'Check that a guide cone is placed correctly to secure the work area.',
+    },
+    {
+      label: 'Face Mask',
+      description:
+        'Ensure the operator is wearing the required face mask or respiratory protection.',
+    },
+    {
+      label: 'Gloves',
+      description:
+        'Ensure protective gloves are worn while performing the lavatory service task.',
+    },
+    {
+      label: 'Shoes',
+      description:
+        'Confirm the operator is wearing appropriate closed-toe safety footwear.',
+    },
+    {
+      label: 'Dump',
+      description:
+        'Verify the dump process is completed safely without leakage or contamination.',
+    },
+    {
+      label: 'Flush',
+      description:
+        'Confirm the flush process is performed completely and according to procedure.',
+    },
+    {
+      label: 'Fill',
+      description:
+        'Verify the lavatory system is refilled correctly and safely after service.',
+    },
+    {
+      label: '360 Walk Around',
+      description:
+        'Confirm a full 360-degree walk-around inspection is completed before departure.',
+    },
+    {
+      label: 'Chock Removal Process',
+      description:
+        'Verify chocks are removed only after servicing is complete and the area is safe.',
+    },
   ];
-  for (const [index, label] of lavChecklist.entries()) {
+  for (const [index, item] of lavChecklist.entries()) {
+    const label = item.label;
     const code = label.toUpperCase().replace(/[^A-Z0-9]+/g, '_');
     await prisma.lavSafetyChecklistItem.upsert({
       where: { code },
-      update: { label, sortOrder: index + 1, isActive: true },
-      create: { code, label, sortOrder: index + 1, isActive: true },
+      update: {
+        label,
+        description: item.description,
+        sortOrder: index + 1,
+        isActive: true,
+      },
+      create: {
+        code,
+        label,
+        description: item.description,
+        sortOrder: index + 1,
+        isActive: true,
+      },
     });
   }
 

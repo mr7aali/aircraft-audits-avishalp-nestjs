@@ -148,11 +148,14 @@ export class CabinSecuritySearchTrainingsService {
       throw new BadRequestException('Duplicate areas are not allowed');
     }
 
-    const overallResult = dto.areaResults.some(
+    const hasFailedArea = dto.areaResults.some(
       (entry) => entry.result === PassFail.FAIL,
-    )
-      ? PassFail.FAIL
-      : PassFail.PASS;
+    );
+    const hasMissingHiddenObject = hiddenObjectAudit
+      ? (dto.hiddenObjectLocationResults ?? []).some((entry) => !entry.found)
+      : false;
+    const overallResult =
+      hasFailedArea || hasMissingHiddenObject ? PassFail.FAIL : PassFail.PASS;
 
     const training = await this.prisma.$transaction(async (tx) => {
       const detailedResultsJson =

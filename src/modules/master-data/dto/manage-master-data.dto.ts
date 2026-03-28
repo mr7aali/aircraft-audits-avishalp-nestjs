@@ -265,6 +265,12 @@ export class CreateLavSafetyChecklistItemDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  description?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
   @Transform(({ value }) => (value == null ? value : Number(value)))
   @IsInt()
   @Min(0)
@@ -289,6 +295,12 @@ export class UpdateLavSafetyChecklistItemDto {
   @IsString()
   @MaxLength(120)
   label?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  description?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

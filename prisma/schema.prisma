@@ -412,6 +412,7 @@ model LavSafetyChecklistItem {
   id        String                         @id @default(uuid()) @db.Uuid
   code      String                         @unique
   label     String
+  description String?
   sortOrder Int                            @default(0)
   isActive  Boolean                        @default(true)
   responses LavSafetyObservationResponse[]

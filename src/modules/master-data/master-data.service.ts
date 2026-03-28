@@ -218,6 +218,7 @@ export class MasterDataService {
       data: {
         code: dto.code.trim().toUpperCase(),
         label: dto.label.trim(),
+        description: dto.description?.trim() || null,
         sortOrder: dto.sortOrder ?? 0,
         isActive: dto.isActive ?? true,
       },
@@ -238,6 +239,9 @@ export class MasterDataService {
       data: {
         ...(dto.code != null ? { code: dto.code.trim().toUpperCase() } : {}),
         ...(dto.label != null ? { label: dto.label.trim() } : {}),
+        ...(dto.description != null
+          ? { description: dto.description.trim() || null }
+          : {}),
         ...(dto.sortOrder != null ? { sortOrder: dto.sortOrder } : {}),
         ...(dto.isActive != null ? { isActive: dto.isActive } : {}),
       },
