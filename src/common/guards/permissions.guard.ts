@@ -10,6 +10,7 @@ import {
   REQUIRE_PERMISSION_KEY,
   REQUIRE_ACTIVE_STATION_KEY,
 } from '../constants/auth.constants.js';
+import { PermissionAction } from '../constants/module-codes.js';
 import { RequirePermissionMetadata } from '../decorators/require-permission.decorator.js';
 import { AuthenticatedUser } from '../types/authenticated-user.type.js';
 
@@ -78,7 +79,7 @@ export class PermissionsGuard implements CanActivate {
       },
     });
 
-    if (!access || !access.isActive) {
+    if (!access || !access.isActive || !access.role.isActive) {
       throw new ForbiddenException('No active station access');
     }
 
@@ -90,17 +91,43 @@ export class PermissionsGuard implements CanActivate {
       throw new ForbiddenException('Permission denied');
     }
 
-    const isAllowed =
-      permissionMetadata.action === 'list'
-        ? moduleAccess.canList
-        : permissionMetadata.action === 'view'
-          ? moduleAccess.canView
-          : moduleAccess.canCreate;
+    const isAllowed = this.isAllowed(moduleAccess, permissionMetadata.action);
 
     if (!isAllowed) {
       throw new ForbiddenException('Permission denied');
     }
 
     return true;
+  }
+
+  private isAllowed(
+    moduleAccess: {
+      canRead: boolean;
+      canWrite: boolean;
+      canEdit: boolean;
+      canDelete: boolean;
+      canList: boolean;
+      canView: boolean;
+      canCreate: boolean;
+    },
+    action: PermissionAction,
+  ) {
+    switch (action) {
+      case 'list':
+      case 'view':
+      case 'read':
+        return (
+          moduleAccess.canRead || moduleAccess.canList || moduleAccess.canView
+        );
+      case 'create':
+      case 'write':
+        return moduleAccess.canWrite || moduleAccess.canCreate;
+      case 'edit':
+        return moduleAccess.canEdit || moduleAccess.canCreate;
+      case 'delete':
+        return moduleAccess.canDelete || moduleAccess.canCreate;
+      default:
+        return false;
+    }
   }
 }
