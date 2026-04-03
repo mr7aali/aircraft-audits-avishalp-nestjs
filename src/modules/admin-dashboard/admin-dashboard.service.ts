@@ -19,6 +19,7 @@ import {
   AdminDashboardAuditRecordsQueryDto,
   AdminDashboardOverviewQueryDto,
 } from './dto/admin-dashboard-query.dto.js';
+import { summarizeCabinQualityStoredResults } from '../cabin-quality-audits/utils/cabin-quality-scoring.util.js';
 
 type AuditRecordItem = {
   id: string;
@@ -131,13 +132,17 @@ export class AdminDashboardService {
         hiddenObject: hiddenObject.length,
         lavSafety: lavSafety.length,
       },
-      compliance: {
-        overallScore: this.averageScore(records.map((item) => item.score)),
-        cabinQualityScore: this.averageScore(
-          cabinQuality.map(
-            (item) => this.scoreCabinQuality(item.responses).score,
+        compliance: {
+          overallScore: this.averageScore(records.map((item) => item.score)),
+          cabinQualityScore: this.averageScore(
+            cabinQuality.map(
+              (item) =>
+                this.scoreCabinQuality(
+                  item.responses,
+                  item.detailedResultsJson,
+                ).score,
+            ),
           ),
-        ),
         cabinSecurityScore: this.averageScore(
           cabinSecurity.map(
             (item) => this.scoreCabinSecurity(item.results).score,
@@ -150,11 +155,15 @@ export class AdminDashboardService {
           lavSafety.map((item) => this.scoreLavSafety(item.responses).score),
         ),
       },
-      attentionRequired: {
-        total: records.filter((item) => item.status === 'FAIL').length,
-        cabinQuality: cabinQuality.filter(
-          (item) => this.scoreCabinQuality(item.responses).status === 'FAIL',
-        ).length,
+        attentionRequired: {
+          total: records.filter((item) => item.status === 'FAIL').length,
+          cabinQuality: cabinQuality.filter(
+            (item) =>
+              this.scoreCabinQuality(
+                item.responses,
+                item.detailedResultsJson,
+              ).status === 'FAIL',
+          ).length,
         cabinSecurity: cabinSecurity.filter(
           (item) => this.scoreCabinSecurity(item.results).status === 'FAIL',
         ).length,
@@ -267,7 +276,10 @@ export class AdminDashboardService {
           throw new NotFoundException('Cabin quality audit not found');
         }
 
-        return audit;
+        return {
+          ...audit,
+          scoreSummary: summarizeCabinQualityStoredResults(audit.detailedResultsJson),
+        };
       }
 
       case AdminAuditType.CABIN_SECURITY: {
@@ -488,9 +500,13 @@ export class AdminDashboardService {
     auditorNameSnapshot: string;
     gateCodeSnapshot: string;
     cleanTypeSnapshot: string;
+    detailedResultsJson?: Prisma.JsonValue | null;
     responses: { response: YesNoNa }[];
   }): AuditRecordItem {
-    const result = this.scoreCabinQuality(item.responses);
+    const result = this.scoreCabinQuality(
+      item.responses,
+      item.detailedResultsJson,
+    );
     return {
       id: item.id,
       auditType: AdminAuditType.CABIN_QUALITY,
@@ -571,10 +587,22 @@ export class AdminDashboardService {
     };
   }
 
-  private scoreCabinQuality(responses: { response: YesNoNa }[]): {
+  private scoreCabinQuality(
+    responses: { response: YesNoNa }[],
+    detailedResultsJson?: Prisma.JsonValue | null,
+  ): {
     score: number;
     status: 'PASS' | 'FAIL';
   } {
+    const weightedSummary =
+      summarizeCabinQualityStoredResults(detailedResultsJson);
+    if (weightedSummary) {
+      return {
+        score: weightedSummary.score,
+        status: weightedSummary.status,
+      };
+    }
+
     const applicable = responses.filter((item) => item.response !== YesNoNa.NA);
     const passed = applicable.filter(
       (item) => item.response === YesNoNa.YES,

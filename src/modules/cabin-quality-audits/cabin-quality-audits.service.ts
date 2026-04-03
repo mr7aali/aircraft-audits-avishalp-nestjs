@@ -11,6 +11,10 @@ import { buildPaginatedResult } from '../../common/utils/pagination.util.js';
 import { CreateCabinQualityAuditDto } from './dto/create-cabin-quality-audit.dto.js';
 import { ListCabinQualityAuditsDto } from './dto/list-cabin-quality-audits.dto.js';
 import { ShiftContextService } from '../../common/services/shift-context.service.js';
+import {
+  scoreCabinQualityAreaResults,
+  summarizeCabinQualityStoredResults,
+} from './utils/cabin-quality-scoring.util.js';
 
 @Injectable()
 export class CabinQualityAuditsService {
@@ -79,21 +83,29 @@ export class CabinQualityAuditsService {
     }
 
     const audit = await this.prisma.$transaction(async (tx) => {
-      const detailedResultsJson =
+      const scoredAreaResults =
         dto.areaResults == null
-          ? undefined
-          : (dto.areaResults.map((area) => ({
-              areaId: area.areaId.trim(),
-              sectionLabel: area.sectionLabel.trim(),
-              checkItems: area.checkItems.map((checkItem) => ({
-                itemName: checkItem.itemName.trim(),
-                status: checkItem.status,
-                imageFileIds: checkItem.imageFileIds ?? [],
-                hashtags: (checkItem.hashtags ?? [])
-                  .map((tag) => tag.trim())
-                  .filter((tag) => tag.length > 0),
+          ? null
+          : scoreCabinQualityAreaResults(
+              dto.areaResults.map((area) => ({
+                areaId: area.areaId.trim(),
+                sectionLabel: area.sectionLabel.trim(),
+                areaGroup: area.areaGroup,
+                checkItems: area.checkItems.map((checkItem) => ({
+                  itemName: checkItem.itemName.trim(),
+                  status: checkItem.status,
+                  imageFileIds: checkItem.imageFileIds ?? [],
+                  hashtags: (checkItem.hashtags ?? [])
+                    .map((tag) => tag.trim())
+                    .filter((tag) => tag.length > 0),
+                })),
               })),
-            })) as Prisma.InputJsonValue);
+              this.toAreaWeightsInput(dto.areaWeightsSnapshot),
+            );
+      const detailedResultsJson =
+        scoredAreaResults == null
+          ? undefined
+          : (scoredAreaResults as Prisma.InputJsonValue);
 
       const created = await tx.cabinQualityAudit.create({
         data: {
@@ -250,6 +262,7 @@ export class CabinQualityAuditsService {
     return {
       ...audit,
       ...this.parseAuditMetadata(audit.additionalNotes),
+      scoreSummary: summarizeCabinQualityStoredResults(audit.detailedResultsJson),
     };
   }
 
@@ -285,6 +298,23 @@ export class CabinQualityAuditsService {
     return {
       shipNumber,
       flightNumber,
+    };
+  }
+
+  private toAreaWeightsInput(
+    snapshot?: CreateCabinQualityAuditDto['areaWeightsSnapshot'],
+  ) {
+    if (!snapshot) {
+      return undefined;
+    }
+
+    return {
+      lav: snapshot.lav,
+      galley: snapshot.galley,
+      main_cabin: snapshot.main_cabin,
+      first_class: snapshot.first_class,
+      comfort: snapshot.comfort,
+      other: snapshot.other,
     };
   }
 }
