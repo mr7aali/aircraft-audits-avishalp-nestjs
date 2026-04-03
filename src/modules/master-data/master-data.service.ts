@@ -23,6 +23,15 @@ import {
   UpdateStationDto,
 } from './dto/manage-master-data.dto.js';
 
+const defaultCabinQualityAreaWeights = {
+  lav: 25,
+  galley: 20,
+  main_cabin: 18,
+  first_class: 15,
+  comfort: 12,
+  other: 10,
+} as const;
+
 @Injectable()
 export class MasterDataService {
   constructor(private readonly prisma: PrismaService) {}
@@ -547,8 +556,14 @@ export class MasterDataService {
   private normalizeAircraftSeatMap(
     seatMap: AircraftSeatMapDto,
   ): Prisma.InputJsonValue {
+    const areaWeights = {
+      ...defaultCabinQualityAreaWeights,
+      ...(seatMap.areaWeights ?? {}),
+    };
+
     return {
       hasFirstClassArc: seatMap.hasFirstClassArc ?? false,
+      areaWeights,
       sections: seatMap.sections.map((section) => ({
         name: section.name.trim(),
         startRow: section.startRow,

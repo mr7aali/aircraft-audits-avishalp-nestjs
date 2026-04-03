@@ -6,6 +6,7 @@ import {
   IsIn,
   IsArray,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
@@ -478,12 +479,56 @@ export class AircraftSeatMapSectionDto {
   skipRows?: number[];
 }
 
+export class AircraftSeatMapAreaWeightsDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(0)
+  lav?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(0)
+  galley?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(0)
+  main_cabin?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(0)
+  first_class?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(0)
+  comfort?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(0)
+  other?: number;
+}
+
 export class AircraftSeatMapDto {
   @ApiPropertyOptional()
   @IsOptional()
   @Transform(toBoolean)
   @IsBoolean()
   hasFirstClassArc?: boolean;
+
+  @ApiPropertyOptional({ type: AircraftSeatMapAreaWeightsDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AircraftSeatMapAreaWeightsDto)
+  areaWeights?: AircraftSeatMapAreaWeightsDto;
 
   @ApiProperty({ type: [AircraftSeatMapSectionDto] })
   @IsArray()

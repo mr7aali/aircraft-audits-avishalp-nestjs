@@ -7,12 +7,23 @@ import {
   IsEnum,
   IsIn,
   IsOptional,
+  IsNumber,
   IsString,
   IsUUID,
+  Min,
   MaxLength,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+
+const cabinQualityAreaGroups = [
+  'lav',
+  'galley',
+  'main_cabin',
+  'first_class',
+  'comfort',
+  'other',
+] as const;
 
 export class CabinQualityAuditResponseInputDto {
   @ApiProperty()
@@ -26,7 +37,7 @@ export class CabinQualityAuditResponseInputDto {
   @ApiPropertyOptional({ type: [String] })
   @IsOptional()
   @IsArray()
-  @IsUUID('4', { each: true })
+  @IsUUID('all', { each: true })
   imageFileIds?: string[];
 }
 
@@ -43,7 +54,7 @@ export class CabinQualityAuditDetailedCheckItemDto {
   @ApiPropertyOptional({ type: [String] })
   @IsOptional()
   @IsArray()
-  @IsUUID('4', { each: true })
+  @IsUUID('all', { each: true })
   imageFileIds?: string[];
 
   @ApiPropertyOptional({ type: [String] })
@@ -65,12 +76,55 @@ export class CabinQualityAuditDetailedAreaDto {
   @MaxLength(100)
   sectionLabel!: string;
 
+  @ApiPropertyOptional({ enum: cabinQualityAreaGroups })
+  @IsOptional()
+  @IsIn(cabinQualityAreaGroups)
+  areaGroup?: (typeof cabinQualityAreaGroups)[number];
+
   @ApiProperty({ type: [CabinQualityAuditDetailedCheckItemDto] })
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => CabinQualityAuditDetailedCheckItemDto)
   checkItems!: CabinQualityAuditDetailedCheckItemDto[];
+}
+
+export class CabinQualityAreaWeightsSnapshotDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(0)
+  lav?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(0)
+  galley?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(0)
+  main_cabin?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(0)
+  first_class?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(0)
+  comfort?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(0)
+  other?: number;
 }
 
 export class CreateCabinQualityAuditDto {
@@ -100,7 +154,7 @@ export class CreateCabinQualityAuditDto {
   @ApiProperty({ type: [CabinQualityAuditResponseInputDto] })
   @IsArray()
   @ArrayMinSize(1)
-  @ArrayMaxSize(30)
+  @ArrayMaxSize(200)
   @ValidateNested({ each: true })
   @Type(() => CabinQualityAuditResponseInputDto)
   responses!: CabinQualityAuditResponseInputDto[];
@@ -111,6 +165,12 @@ export class CreateCabinQualityAuditDto {
   @ValidateNested({ each: true })
   @Type(() => CabinQualityAuditDetailedAreaDto)
   areaResults?: CabinQualityAuditDetailedAreaDto[];
+
+  @ApiPropertyOptional({ type: CabinQualityAreaWeightsSnapshotDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CabinQualityAreaWeightsSnapshotDto)
+  areaWeightsSnapshot?: CabinQualityAreaWeightsSnapshotDto;
 
   @ApiProperty()
   @IsUUID()
@@ -131,6 +191,6 @@ export class CreateCabinQualityAuditDto {
   @ApiPropertyOptional({ type: [String] })
   @IsOptional()
   @IsArray()
-  @IsUUID('4', { each: true })
+  @IsUUID('all', { each: true })
   generalPictureFileIds?: string[];
 }
