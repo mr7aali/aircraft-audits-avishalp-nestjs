@@ -1,6 +1,7 @@
 import { PartialType } from '@nestjs/swagger';
 import {
   ArrayMaxSize,
+  IsEmail,
   IsArray,
   IsBoolean,
   IsIn,
@@ -79,6 +80,39 @@ export class UpdateRolePermissionsDto {
 }
 
 export class AssignUserRoleDto {
+  @IsUUID()
+  roleId!: string;
+}
+
+export class CreateAccessUserDto {
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(3)
+  @MaxLength(60)
+  uid!: string;
+
+  @IsEmail()
+  @MaxLength(120)
+  email!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(2)
+  @MaxLength(80)
+  firstName!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(2)
+  @MaxLength(80)
+  lastName!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(8)
+  @MaxLength(120)
+  password!: string;
+
   @IsUUID()
   roleId!: string;
 }
