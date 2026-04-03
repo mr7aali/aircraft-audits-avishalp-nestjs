@@ -74,12 +74,7 @@ export class AccessControlController {
     @Param('id') id: string,
     @Body() dto: AssignUserRoleDto,
   ) {
-    return this.accessControlService.assignUserRole(
-      user,
-      id,
-      dto.roleId,
-      dto.isDefault,
-    );
+    return this.accessControlService.assignUserRole(user, id, dto.roleId);
   }
 
   @Get('modules')

@@ -312,14 +312,13 @@ export class AccessControlService implements OnModuleInit {
           email: entry.email,
           firstName: entry.firstName,
           lastName: entry.lastName,
-          fullName: '${entry.firstName} ${entry.lastName}'.trim(),
+          fullName: `${entry.firstName} ${entry.lastName}`.trim(),
           status: entry.status,
           roleId: access?.roleId,
           roleCode: access?.role.code,
           roleName: access?.role.name,
           isRoleActive: access?.role.isActive ?? false,
           isAssigned: access != null && access.isActive,
-          isDefault: access?.isDefault ?? false,
         };
       }),
     };
@@ -329,7 +328,6 @@ export class AccessControlService implements OnModuleInit {
     actor: AuthenticatedUser,
     targetUserId: string,
     roleId: string,
-    isDefault?: boolean,
   ) {
     const stationId = this.getStationId(actor);
 
@@ -363,42 +361,19 @@ export class AccessControlService implements OnModuleInit {
       throw new NotFoundException('Role not found');
     }
 
-    const existing = await this.prisma.userStationAccess.findUnique({
-      where: {
-        userId_stationId: {
-          userId: targetUserId,
-          stationId,
-        },
-      },
-    });
+    const shouldBeDefault = true;
 
-    const shouldBeDefault =
-      isDefault ??
-      existing?.isDefault ??
-      !(await this.prisma.userStationAccess.findFirst({
+    await this.prisma.$transaction(async (tx) => {
+      await tx.userStationAccess.updateMany({
         where: {
           userId: targetUserId,
           isActive: true,
         },
-        select: {
-          id: true,
+        data: {
+          roleId,
+          isDefault: false,
         },
-      }));
-
-    await this.prisma.$transaction(async (tx) => {
-      if (shouldBeDefault) {
-        await tx.userStationAccess.updateMany({
-          where: {
-            userId: targetUserId,
-            NOT: {
-              stationId,
-            },
-          },
-          data: {
-            isDefault: false,
-          },
-        });
-      }
+      });
 
       await tx.userStationAccess.upsert({
         where: {
@@ -428,12 +403,11 @@ export class AccessControlService implements OnModuleInit {
       email: targetUser.email,
       firstName: targetUser.firstName,
       lastName: targetUser.lastName,
-      fullName: '${targetUser.firstName} ${targetUser.lastName}'.trim(),
+      fullName: `${targetUser.firstName} ${targetUser.lastName}`.trim(),
       roleId: role.id,
       roleCode: role.code,
       roleName: role.name,
       isAssigned: true,
-      isDefault: shouldBeDefault,
       isRoleActive: role.isActive,
     };
   }
@@ -490,7 +464,7 @@ export class AccessControlService implements OnModuleInit {
         name: role.name,
         description: role.description,
         isActive: role.isActive,
-        isSystemRole: this.protectedRoleCodes.has(role.code),
+        isSystemRole: true,
       },
       systems: this.groupModulesBySystem(
         modules.map((module) => {
@@ -699,7 +673,7 @@ export class AccessControlService implements OnModuleInit {
       name: role.name,
       description: role.description,
       isActive: role.isActive,
-      isSystemRole: this.protectedRoleCodes.has(role.code),
+      isSystemRole: true,
       userCount: role.stationAccesses.length,
       moduleCounts: systemSummary,
       createdAt: role.createdAt,

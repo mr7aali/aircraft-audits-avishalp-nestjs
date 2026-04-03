@@ -81,8 +81,4 @@ export class UpdateRolePermissionsDto {
 export class AssignUserRoleDto {
   @IsUUID()
   roleId!: string;
-
-  @IsOptional()
-  @IsBoolean()
-  isDefault?: boolean;
 }
