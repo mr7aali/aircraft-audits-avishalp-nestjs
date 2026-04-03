@@ -11,6 +11,7 @@ model Role {
   id              String              @id @default(uuid()) @db.Uuid
   code            String              @unique
   name            String
+  description     String?
   isActive        Boolean             @default(true)
   createdAt       DateTime            @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime            @updatedAt @db.Timestamptz(3)
@@ -128,6 +129,10 @@ model AppModule {
   id           String             @id @default(uuid()) @db.Uuid
   code         String             @unique
   name         String
+  description  String?
+  routePath    String?
+  sortOrder    Int                @default(0)
+  systemType   SystemType         @default(APP)
   roleAccesses RoleModuleAccess[]
 
   @@map("app_modules")
@@ -137,6 +142,10 @@ model RoleModuleAccess {
   id        String    @id @default(uuid()) @db.Uuid
   roleId    String    @db.Uuid
   moduleId  String    @db.Uuid
+  canRead   Boolean   @default(false)
+  canWrite  Boolean   @default(false)
+  canEdit   Boolean   @default(false)
+  canDelete Boolean   @default(false)
   canList   Boolean   @default(false)
   canView   Boolean   @default(false)
   canCreate Boolean   @default(false)
@@ -409,13 +418,13 @@ model CabinQualityAuditFile {
 }
 
 model LavSafetyChecklistItem {
-  id        String                         @id @default(uuid()) @db.Uuid
-  code      String                         @unique
-  label     String
+  id          String                         @id @default(uuid()) @db.Uuid
+  code        String                         @unique
+  label       String
   description String?
-  sortOrder Int                            @default(0)
-  isActive  Boolean                        @default(true)
-  responses LavSafetyObservationResponse[]
+  sortOrder   Int                            @default(0)
+  isActive    Boolean                        @default(true)
+  responses   LavSafetyObservationResponse[]
 
   @@map("lav_safety_checklist_items")
 }
@@ -1045,6 +1054,11 @@ enum RatingScale {
 enum ConversationType {
   DIRECT
   GROUP
+}
+
+enum SystemType {
+  APP
+  ADMIN_DASHBOARD
 }
 
 enum ConversationMemberRole {

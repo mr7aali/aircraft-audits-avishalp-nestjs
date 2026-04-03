@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuthenticatedUser } from '../../common/types/authenticated-user.type.js';
+import { SystemType } from '../../generated/prisma-client/enums.js';
 
 @Injectable()
 export class StationsService {
@@ -32,7 +33,9 @@ export class StationsService {
       orderBy: [{ code: 'asc' }, { name: 'asc' }],
     });
 
-    const assignedStationIds = new Set(accesses.map((entry) => entry.stationId));
+    const assignedStationIds = new Set(
+      accesses.map((entry) => entry.stationId),
+    );
     const stations = accesses.map((entry) => ({
       stationId: entry.stationId,
       stationCode: entry.station.code,
@@ -65,7 +68,8 @@ export class StationsService {
 
     return {
       stations,
-      autoSelectSuggested: assignedStationIds.size == 1 && allActiveStations.length == 1,
+      autoSelectSuggested:
+        assignedStationIds.size == 1 && allActiveStations.length == 1,
     };
   }
 
@@ -79,7 +83,15 @@ export class StationsService {
       },
       include: {
         station: true,
-        role: true,
+        role: {
+          include: {
+            moduleAccesses: {
+              include: {
+                module: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -131,7 +143,15 @@ export class StationsService {
         },
         include: {
           station: true,
-          role: true,
+          role: {
+            include: {
+              moduleAccesses: {
+                include: {
+                  module: true,
+                },
+              },
+            },
+          },
         },
       });
     }
@@ -147,6 +167,7 @@ export class StationsService {
       stationName: access.station.name,
       roleCode: access.role.code,
       roleName: access.role.name,
+      permissions: this.mapPermissions(access.role.moduleAccesses),
     };
   }
 
@@ -170,7 +191,15 @@ export class StationsService {
         },
       },
       include: {
-        role: true,
+        role: {
+          include: {
+            moduleAccesses: {
+              include: {
+                module: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -185,6 +214,38 @@ export class StationsService {
       timezone: session.activeStation.timezone,
       roleCode: access.role.code,
       roleName: access.role.name,
+      permissions: this.mapPermissions(access.role.moduleAccesses),
     };
+  }
+
+  private mapPermissions(
+    moduleAccesses: Array<{
+      canRead: boolean;
+      canWrite: boolean;
+      canEdit: boolean;
+      canDelete: boolean;
+      canList: boolean;
+      canView: boolean;
+      canCreate: boolean;
+      module: {
+        code: string;
+        name: string;
+        systemType: SystemType;
+        routePath: string | null;
+      };
+    }>,
+  ) {
+    return moduleAccesses
+      .map((item) => ({
+        moduleCode: item.module.code,
+        moduleName: item.module.name,
+        systemType: item.module.systemType,
+        routePath: item.module.routePath,
+        canRead: item.canRead || item.canList || item.canView,
+        canWrite: item.canWrite || item.canCreate,
+        canEdit: item.canEdit || item.canCreate,
+        canDelete: item.canDelete || item.canCreate,
+      }))
+      .sort((left, right) => left.moduleName.localeCompare(right.moduleName));
   }
 }

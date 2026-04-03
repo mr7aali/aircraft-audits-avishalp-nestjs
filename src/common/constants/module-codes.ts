@@ -1,3 +1,10 @@
+export const SYSTEM_TYPES = {
+  APP: 'APP',
+  ADMIN_DASHBOARD: 'ADMIN_DASHBOARD',
+} as const;
+
+export type SystemType = (typeof SYSTEM_TYPES)[keyof typeof SYSTEM_TYPES];
+
 export const MODULE_CODES = {
   CABIN_QUALITY_AUDIT: 'CABIN_QUALITY_AUDIT',
   LAV_SAFETY_OBSERVATION: 'LAV_SAFETY_OBSERVATION',
@@ -10,8 +17,309 @@ export const MODULE_CODES = {
   MASTER_DATA: 'MASTER_DATA',
   FILES: 'FILES',
   STATIONS: 'STATIONS',
+  ADMIN_DASHBOARD_OVERVIEW: 'ADMIN_DASHBOARD_OVERVIEW',
+  ADMIN_DASHBOARD_FLIGHTS: 'ADMIN_DASHBOARD_FLIGHTS',
+  ADMIN_DASHBOARD_INVENTORY: 'ADMIN_DASHBOARD_INVENTORY',
+  ADMIN_DASHBOARD_SHIFT_REPORT: 'ADMIN_DASHBOARD_SHIFT_REPORT',
+  ADMIN_DASHBOARD_AUDIT_OPERATIONS: 'ADMIN_DASHBOARD_AUDIT_OPERATIONS',
+  ADMIN_DASHBOARD_AUDIT_REPORTS: 'ADMIN_DASHBOARD_AUDIT_REPORTS',
+  ADMIN_DASHBOARD_TRAINING: 'ADMIN_DASHBOARD_TRAINING',
+  ADMIN_DASHBOARD_SAFETY: 'ADMIN_DASHBOARD_SAFETY',
+  ADMIN_DASHBOARD_SECURITY: 'ADMIN_DASHBOARD_SECURITY',
+  ADMIN_DASHBOARD_EMPLOYEES: 'ADMIN_DASHBOARD_EMPLOYEES',
+  ADMIN_DASHBOARD_ONE_ON_ONE: 'ADMIN_DASHBOARD_ONE_ON_ONE',
+  ADMIN_DASHBOARD_FEEDBACK: 'ADMIN_DASHBOARD_FEEDBACK',
+  ADMIN_DASHBOARD_DISCIPLINARY: 'ADMIN_DASHBOARD_DISCIPLINARY',
+  ADMIN_DASHBOARD_FORMS_LIBRARY: 'ADMIN_DASHBOARD_FORMS_LIBRARY',
+  ADMIN_DASHBOARD_SUBMISSIONS: 'ADMIN_DASHBOARD_SUBMISSIONS',
+  ADMIN_DASHBOARD_MASTER_DATA: 'ADMIN_DASHBOARD_MASTER_DATA',
+  ADMIN_DASHBOARD_TASKS: 'ADMIN_DASHBOARD_TASKS',
+  ADMIN_DASHBOARD_CHAT: 'ADMIN_DASHBOARD_CHAT',
+  ADMIN_DASHBOARD_ANALYTICS: 'ADMIN_DASHBOARD_ANALYTICS',
+  ADMIN_DASHBOARD_APP_PUSH: 'ADMIN_DASHBOARD_APP_PUSH',
+  ADMIN_DASHBOARD_SETTINGS: 'ADMIN_DASHBOARD_SETTINGS',
+  ADMIN_DASHBOARD_ROLE_MANAGEMENT: 'ADMIN_DASHBOARD_ROLE_MANAGEMENT',
 } as const;
 
 export type ModuleCode = (typeof MODULE_CODES)[keyof typeof MODULE_CODES];
 
-export type PermissionAction = 'list' | 'view' | 'create';
+export type PermissionAction =
+  | 'list'
+  | 'view'
+  | 'create'
+  | 'read'
+  | 'write'
+  | 'edit'
+  | 'delete';
+
+export interface AccessControlModuleDefinition {
+  code: ModuleCode;
+  name: string;
+  systemType: SystemType;
+  routePath?: string;
+  description?: string;
+  sortOrder: number;
+}
+
+export const ACCESS_CONTROL_MODULES: readonly AccessControlModuleDefinition[] =
+  [
+    {
+      code: MODULE_CODES.CABIN_QUALITY_AUDIT,
+      name: 'Cabin Quality Audit',
+      systemType: SYSTEM_TYPES.APP,
+      routePath: '/cabin-audit',
+      description: 'Mobile cabin quality audit workflow access.',
+      sortOrder: 10,
+    },
+    {
+      code: MODULE_CODES.LAV_SAFETY_OBSERVATION,
+      name: 'LAV Safety Observation',
+      systemType: SYSTEM_TYPES.APP,
+      routePath: '/LAVSafety',
+      description: 'Mobile LAV safety observation workflow access.',
+      sortOrder: 20,
+    },
+    {
+      code: MODULE_CODES.CABIN_SECURITY_SEARCH_TRAINING,
+      name: 'Cabin Security Search Training',
+      systemType: SYSTEM_TYPES.APP,
+      routePath: '/cabin_secuirity',
+      description: 'Mobile cabin security search training workflow access.',
+      sortOrder: 30,
+    },
+    {
+      code: MODULE_CODES.HIDDEN_OBJECT_AUDIT,
+      name: 'Hidden Object Audit',
+      systemType: SYSTEM_TYPES.APP,
+      routePath: '/hidden_object_audit',
+      description: 'Mobile hidden object audit workflow access.',
+      sortOrder: 40,
+    },
+    {
+      code: MODULE_CODES.END_OF_SHIFT_REPORT,
+      name: 'End Of Shift Report',
+      systemType: SYSTEM_TYPES.APP,
+      description: 'Mobile end-of-shift reporting access.',
+      sortOrder: 50,
+    },
+    {
+      code: MODULE_CODES.EMPLOYEE_ONE_ON_ONE,
+      name: 'Employee 1:1',
+      systemType: SYSTEM_TYPES.APP,
+      description: 'Mobile employee one-on-one workflow access.',
+      sortOrder: 60,
+    },
+    {
+      code: MODULE_CODES.FEEDBACK,
+      name: 'Feedback',
+      systemType: SYSTEM_TYPES.APP,
+      routePath: '/feedback',
+      description: 'Mobile employee feedback workflow access.',
+      sortOrder: 70,
+    },
+    {
+      code: MODULE_CODES.CHAT,
+      name: 'Chat',
+      systemType: SYSTEM_TYPES.APP,
+      routePath: '/chat',
+      description: 'Mobile operational chat access.',
+      sortOrder: 80,
+    },
+    {
+      code: MODULE_CODES.MASTER_DATA,
+      name: 'Master Data',
+      systemType: SYSTEM_TYPES.APP,
+      description: 'App-level reference data access.',
+      sortOrder: 90,
+    },
+    {
+      code: MODULE_CODES.FILES,
+      name: 'Files',
+      systemType: SYSTEM_TYPES.APP,
+      description: 'App-level file access.',
+      sortOrder: 100,
+    },
+    {
+      code: MODULE_CODES.STATIONS,
+      name: 'Stations',
+      systemType: SYSTEM_TYPES.APP,
+      description: 'Station selection and station context access.',
+      sortOrder: 110,
+    },
+    {
+      code: MODULE_CODES.ADMIN_DASHBOARD_OVERVIEW,
+      name: 'Dashboard Overview',
+      systemType: SYSTEM_TYPES.ADMIN_DASHBOARD,
+      routePath: '/dashboard',
+      description: 'Admin dashboard overview access.',
+      sortOrder: 200,
+    },
+    {
+      code: MODULE_CODES.ADMIN_DASHBOARD_FLIGHTS,
+      name: 'Active Movements',
+      systemType: SYSTEM_TYPES.ADMIN_DASHBOARD,
+      routePath: '/flights',
+      description: 'Admin dashboard active movements page access.',
+      sortOrder: 210,
+    },
+    {
+      code: MODULE_CODES.ADMIN_DASHBOARD_INVENTORY,
+      name: 'Supply Chain',
+      systemType: SYSTEM_TYPES.ADMIN_DASHBOARD,
+      routePath: '/inventory',
+      description: 'Admin dashboard inventory page access.',
+      sortOrder: 220,
+    },
+    {
+      code: MODULE_CODES.ADMIN_DASHBOARD_SHIFT_REPORT,
+      name: 'Shift Report',
+      systemType: SYSTEM_TYPES.ADMIN_DASHBOARD,
+      routePath: '/shift-report',
+      description: 'Admin dashboard shift report page access.',
+      sortOrder: 230,
+    },
+    {
+      code: MODULE_CODES.ADMIN_DASHBOARD_AUDIT_OPERATIONS,
+      name: 'Audit Operations',
+      systemType: SYSTEM_TYPES.ADMIN_DASHBOARD,
+      routePath: '/audit-operations',
+      description: 'Admin dashboard audit operations page access.',
+      sortOrder: 240,
+    },
+    {
+      code: MODULE_CODES.ADMIN_DASHBOARD_AUDIT_REPORTS,
+      name: 'Audit Reports',
+      systemType: SYSTEM_TYPES.ADMIN_DASHBOARD,
+      routePath: '/audit-reports',
+      description: 'Admin dashboard audit reports page access.',
+      sortOrder: 250,
+    },
+    {
+      code: MODULE_CODES.ADMIN_DASHBOARD_TRAINING,
+      name: 'Training',
+      systemType: SYSTEM_TYPES.ADMIN_DASHBOARD,
+      routePath: '/training',
+      description: 'Admin dashboard training page access.',
+      sortOrder: 260,
+    },
+    {
+      code: MODULE_CODES.ADMIN_DASHBOARD_SAFETY,
+      name: 'Safety Observation',
+      systemType: SYSTEM_TYPES.ADMIN_DASHBOARD,
+      routePath: '/safety',
+      description: 'Admin dashboard safety page access.',
+      sortOrder: 270,
+    },
+    {
+      code: MODULE_CODES.ADMIN_DASHBOARD_SECURITY,
+      name: 'Security Training',
+      systemType: SYSTEM_TYPES.ADMIN_DASHBOARD,
+      routePath: '/security',
+      description: 'Admin dashboard security training page access.',
+      sortOrder: 280,
+    },
+    {
+      code: MODULE_CODES.ADMIN_DASHBOARD_EMPLOYEES,
+      name: 'Staff Directory',
+      systemType: SYSTEM_TYPES.ADMIN_DASHBOARD,
+      routePath: '/employees',
+      description: 'Admin dashboard employee page access.',
+      sortOrder: 290,
+    },
+    {
+      code: MODULE_CODES.ADMIN_DASHBOARD_ONE_ON_ONE,
+      name: '1:1 Meetings',
+      systemType: SYSTEM_TYPES.ADMIN_DASHBOARD,
+      routePath: '/one-on-one',
+      description: 'Admin dashboard one-on-one page access.',
+      sortOrder: 300,
+    },
+    {
+      code: MODULE_CODES.ADMIN_DASHBOARD_FEEDBACK,
+      name: 'Employee Voice',
+      systemType: SYSTEM_TYPES.ADMIN_DASHBOARD,
+      routePath: '/feedback',
+      description: 'Admin dashboard feedback page access.',
+      sortOrder: 310,
+    },
+    {
+      code: MODULE_CODES.ADMIN_DASHBOARD_DISCIPLINARY,
+      name: 'Disciplinary',
+      systemType: SYSTEM_TYPES.ADMIN_DASHBOARD,
+      routePath: '/disciplinary',
+      description: 'Admin dashboard disciplinary page access.',
+      sortOrder: 320,
+    },
+    {
+      code: MODULE_CODES.ADMIN_DASHBOARD_FORMS_LIBRARY,
+      name: 'Forms Ecosystem',
+      systemType: SYSTEM_TYPES.ADMIN_DASHBOARD,
+      routePath: '/forms-library',
+      description: 'Admin dashboard forms library page access.',
+      sortOrder: 330,
+    },
+    {
+      code: MODULE_CODES.ADMIN_DASHBOARD_SUBMISSIONS,
+      name: 'Submissions',
+      systemType: SYSTEM_TYPES.ADMIN_DASHBOARD,
+      routePath: '/submissions',
+      description: 'Admin dashboard submissions page access.',
+      sortOrder: 340,
+    },
+    {
+      code: MODULE_CODES.ADMIN_DASHBOARD_MASTER_DATA,
+      name: 'Master Data',
+      systemType: SYSTEM_TYPES.ADMIN_DASHBOARD,
+      routePath: '/master-data',
+      description: 'Admin dashboard master data management page access.',
+      sortOrder: 350,
+    },
+    {
+      code: MODULE_CODES.ADMIN_DASHBOARD_TASKS,
+      name: 'Task Manager',
+      systemType: SYSTEM_TYPES.ADMIN_DASHBOARD,
+      routePath: '/tasks',
+      description: 'Admin dashboard tasks page access.',
+      sortOrder: 360,
+    },
+    {
+      code: MODULE_CODES.ADMIN_DASHBOARD_CHAT,
+      name: 'Ops Chat',
+      systemType: SYSTEM_TYPES.ADMIN_DASHBOARD,
+      routePath: '/chat',
+      description: 'Admin dashboard chat page access.',
+      sortOrder: 370,
+    },
+    {
+      code: MODULE_CODES.ADMIN_DASHBOARD_ANALYTICS,
+      name: 'Analytics',
+      systemType: SYSTEM_TYPES.ADMIN_DASHBOARD,
+      routePath: '/analytics',
+      description: 'Admin dashboard analytics page access.',
+      sortOrder: 380,
+    },
+    {
+      code: MODULE_CODES.ADMIN_DASHBOARD_APP_PUSH,
+      name: 'Push Manager',
+      systemType: SYSTEM_TYPES.ADMIN_DASHBOARD,
+      routePath: '/app-push',
+      description: 'Admin dashboard push management page access.',
+      sortOrder: 390,
+    },
+    {
+      code: MODULE_CODES.ADMIN_DASHBOARD_SETTINGS,
+      name: 'Settings',
+      systemType: SYSTEM_TYPES.ADMIN_DASHBOARD,
+      routePath: '/settings',
+      description: 'Admin dashboard settings page access.',
+      sortOrder: 400,
+    },
+    {
+      code: MODULE_CODES.ADMIN_DASHBOARD_ROLE_MANAGEMENT,
+      name: 'Role Management',
+      systemType: SYSTEM_TYPES.ADMIN_DASHBOARD,
+      routePath: '/roles',
+      description: 'Admin dashboard role and permission management access.',
+      sortOrder: 410,
+    },
+  ];
