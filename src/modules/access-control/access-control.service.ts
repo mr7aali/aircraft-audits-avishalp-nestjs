@@ -14,10 +14,12 @@ import {
 } from '../../common/constants/module-codes.js';
 import {
   CreateRoleDto,
+  CreateAccessUserDto,
   UpdateRoleDto,
   UpdateRolePermissionsDto,
 } from './dto/access-control.dto.js';
 import { UserStatus } from '../../generated/prisma-client/enums.js';
+import * as argon2 from 'argon2';
 
 type RoleWithAccessCounts = {
   id: string;
@@ -312,24 +314,102 @@ export class AccessControlService implements OnModuleInit {
           email: entry.email,
           firstName: entry.firstName,
           lastName: entry.lastName,
-          fullName: '${entry.firstName} ${entry.lastName}'.trim(),
+          fullName: `${entry.firstName} ${entry.lastName}`.trim(),
           status: entry.status,
           roleId: access?.roleId,
           roleCode: access?.role.code,
           roleName: access?.role.name,
           isRoleActive: access?.role.isActive ?? false,
           isAssigned: access != null && access.isActive,
-          isDefault: access?.isDefault ?? false,
         };
       }),
     };
+  }
+
+  async createUser(dto: CreateAccessUserDto, actor: AuthenticatedUser) {
+    const stationId = this.getStationId(actor);
+    const uid = dto.uid.trim().toLowerCase();
+    const email = dto.email.trim().toLowerCase();
+    const firstName = dto.firstName.trim();
+    const lastName = dto.lastName.trim();
+
+    const role = await this.prisma.role.findUnique({
+      where: { id: dto.roleId },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        isActive: true,
+      },
+    });
+
+    if (!role || !role.isActive) {
+      throw new NotFoundException('Role not found');
+    }
+
+    const passwordHash = await argon2.hash(dto.password);
+
+    try {
+      const createdUser = await this.prisma.$transaction(async (tx) => {
+        const user = await tx.user.create({
+          data: {
+            uid,
+            email,
+            firstName,
+            lastName,
+            passwordHash,
+            status: UserStatus.ACTIVE,
+            publishedAt: new Date(),
+          },
+          select: {
+            id: true,
+            uid: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        });
+
+        await tx.userStationAccess.create({
+          data: {
+            userId: user.id,
+            stationId,
+            roleId: role.id,
+            isActive: true,
+            isDefault: true,
+          },
+        });
+
+        return user;
+      });
+
+      return {
+        id: createdUser.id,
+        uid: createdUser.uid,
+        email: createdUser.email,
+        firstName: createdUser.firstName,
+        lastName: createdUser.lastName,
+        fullName: `${createdUser.firstName} ${createdUser.lastName}`.trim(),
+        status: UserStatus.ACTIVE,
+        roleId: role.id,
+        roleCode: role.code,
+        roleName: role.name,
+        isRoleActive: role.isActive,
+        isAssigned: true,
+      };
+    } catch (error: unknown) {
+      this.handleUniqueConstraint(
+        error,
+        'A user with that user ID or email already exists',
+      );
+      throw error;
+    }
   }
 
   async assignUserRole(
     actor: AuthenticatedUser,
     targetUserId: string,
     roleId: string,
-    isDefault?: boolean,
   ) {
     const stationId = this.getStationId(actor);
 
@@ -363,42 +443,19 @@ export class AccessControlService implements OnModuleInit {
       throw new NotFoundException('Role not found');
     }
 
-    const existing = await this.prisma.userStationAccess.findUnique({
-      where: {
-        userId_stationId: {
-          userId: targetUserId,
-          stationId,
-        },
-      },
-    });
+    const shouldBeDefault = true;
 
-    const shouldBeDefault =
-      isDefault ??
-      existing?.isDefault ??
-      !(await this.prisma.userStationAccess.findFirst({
+    await this.prisma.$transaction(async (tx) => {
+      await tx.userStationAccess.updateMany({
         where: {
           userId: targetUserId,
           isActive: true,
         },
-        select: {
-          id: true,
+        data: {
+          roleId,
+          isDefault: false,
         },
-      }));
-
-    await this.prisma.$transaction(async (tx) => {
-      if (shouldBeDefault) {
-        await tx.userStationAccess.updateMany({
-          where: {
-            userId: targetUserId,
-            NOT: {
-              stationId,
-            },
-          },
-          data: {
-            isDefault: false,
-          },
-        });
-      }
+      });
 
       await tx.userStationAccess.upsert({
         where: {
@@ -428,12 +485,11 @@ export class AccessControlService implements OnModuleInit {
       email: targetUser.email,
       firstName: targetUser.firstName,
       lastName: targetUser.lastName,
-      fullName: '${targetUser.firstName} ${targetUser.lastName}'.trim(),
+      fullName: `${targetUser.firstName} ${targetUser.lastName}`.trim(),
       roleId: role.id,
       roleCode: role.code,
       roleName: role.name,
       isAssigned: true,
-      isDefault: shouldBeDefault,
       isRoleActive: role.isActive,
     };
   }
@@ -490,7 +546,7 @@ export class AccessControlService implements OnModuleInit {
         name: role.name,
         description: role.description,
         isActive: role.isActive,
-        isSystemRole: this.protectedRoleCodes.has(role.code),
+        isSystemRole: true,
       },
       systems: this.groupModulesBySystem(
         modules.map((module) => {
@@ -699,7 +755,7 @@ export class AccessControlService implements OnModuleInit {
       name: role.name,
       description: role.description,
       isActive: role.isActive,
-      isSystemRole: this.protectedRoleCodes.has(role.code),
+      isSystemRole: true,
       userCount: role.stationAccesses.length,
       moduleCounts: systemSummary,
       createdAt: role.createdAt,

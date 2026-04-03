@@ -8,6 +8,8 @@ export class StationsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getMyStations(user: AuthenticatedUser) {
+    await this.normalizeUserActiveRoles(user.id);
+
     const accesses = await this.prisma.userStationAccess.findMany({
       where: {
         userId: user.id,
@@ -74,6 +76,8 @@ export class StationsService {
   }
 
   async selectStation(user: AuthenticatedUser, stationId: string) {
+    await this.normalizeUserActiveRoles(user.id);
+
     let access = await this.prisma.userStationAccess.findUnique({
       where: {
         userId_stationId: {
@@ -172,6 +176,8 @@ export class StationsService {
   }
 
   async getActiveStation(user: AuthenticatedUser) {
+    await this.normalizeUserActiveRoles(user.id);
+
     const session = await this.prisma.authSession.findUnique({
       where: { id: user.sessionId },
       include: {
@@ -247,5 +253,64 @@ export class StationsService {
         canDelete: item.canDelete || item.canCreate,
       }))
       .sort((left, right) => left.moduleName.localeCompare(right.moduleName));
+  }
+
+  private async normalizeUserActiveRoles(userId: string) {
+    const accesses = await this.prisma.userStationAccess.findMany({
+      where: {
+        userId,
+        isActive: true,
+      },
+      select: {
+        stationId: true,
+        roleId: true,
+        isDefault: true,
+        updatedAt: true,
+        createdAt: true,
+      },
+      orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
+    });
+
+    if (accesses.length <= 1) {
+      return;
+    }
+
+    const effectiveRoleId = accesses[0]?.roleId;
+    if (!effectiveRoleId) {
+      return;
+    }
+
+    const defaultStationId =
+      accesses.find((entry) => entry.isDefault)?.stationId ?? accesses[0].stationId;
+    const hasMixedRoles = accesses.some((entry) => entry.roleId !== effectiveRoleId);
+    const defaultCount = accesses.filter((entry) => entry.isDefault).length;
+
+    if (!hasMixedRoles && defaultCount === 1) {
+      return;
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.userStationAccess.updateMany({
+        where: {
+          userId,
+          isActive: true,
+        },
+        data: {
+          roleId: effectiveRoleId,
+          isDefault: false,
+        },
+      }),
+      this.prisma.userStationAccess.update({
+        where: {
+          userId_stationId: {
+            userId,
+            stationId: defaultStationId,
+          },
+        },
+        data: {
+          isDefault: true,
+        },
+      }),
+    ]);
   }
 }
