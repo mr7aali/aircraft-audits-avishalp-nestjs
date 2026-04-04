@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -44,6 +45,36 @@ type RoleWithAccessCounts = {
       systemType: SystemType;
     };
   }>;
+};
+
+type UserStationAccessSummary = {
+  stationId: string;
+  roleId: string;
+  isActive: boolean;
+  isDefault: boolean;
+  createdAt: Date;
+  station: {
+    id: string;
+    code: string;
+    name: string;
+    timezone: string;
+  };
+  role: {
+    id: string;
+    code: string;
+    name: string;
+    isActive: boolean;
+  };
+};
+
+type AccessControlUserSummary = {
+  id: string;
+  uid: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  status: UserStatus;
+  stationAccesses: UserStationAccessSummary[];
 };
 
 @Injectable()
@@ -284,9 +315,20 @@ export class AccessControlService implements OnModuleInit {
         status: true,
         stationAccesses: {
           where: {
-            stationId,
+            isActive: true,
+            station: {
+              isActive: true,
+            },
           },
           include: {
+            station: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                timezone: true,
+              },
+            },
             role: {
               select: {
                 id: true,
@@ -296,7 +338,7 @@ export class AccessControlService implements OnModuleInit {
               },
             },
           },
-          take: 1,
+          orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
         },
       },
       orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
@@ -304,25 +346,15 @@ export class AccessControlService implements OnModuleInit {
     });
 
     return {
-      users: users.map((entry) => {
-        const access =
-          entry.stationAccesses.length > 0 ? entry.stationAccesses[0] : null;
-
-        return {
-          id: entry.id,
-          uid: entry.uid,
-          email: entry.email,
-          firstName: entry.firstName,
-          lastName: entry.lastName,
-          fullName: `${entry.firstName} ${entry.lastName}`.trim(),
-          status: entry.status,
-          roleId: access?.roleId,
-          roleCode: access?.role.code,
-          roleName: access?.role.name,
-          isRoleActive: access?.role.isActive ?? false,
-          isAssigned: access != null && access.isActive,
-        };
-      }),
+      users: users.map((entry) =>
+        this.mapAccessControlUser(
+          {
+            ...entry,
+            stationAccesses: entry.stationAccesses as UserStationAccessSummary[],
+          },
+          stationId,
+        ),
+      ),
     };
   }
 
@@ -347,6 +379,26 @@ export class AccessControlService implements OnModuleInit {
       throw new NotFoundException('Role not found');
     }
 
+    const stationIds = this.normalizeStationIds(dto.stationIds, stationId);
+    const stations = await this.prisma.station.findMany({
+      where: {
+        id: {
+          in: stationIds,
+        },
+        isActive: true,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (stations.length !== stationIds.length) {
+      throw new NotFoundException('One or more selected stations were not found');
+    }
+
+    const defaultStationId = stationIds.includes(stationId)
+      ? stationId
+      : stationIds[0];
     const passwordHash = await argon2.hash(dto.password);
 
     try {
@@ -370,33 +422,20 @@ export class AccessControlService implements OnModuleInit {
           },
         });
 
-        await tx.userStationAccess.create({
-          data: {
+        await tx.userStationAccess.createMany({
+          data: stationIds.map((assignedStationId) => ({
             userId: user.id,
-            stationId,
+            stationId: assignedStationId,
             roleId: role.id,
             isActive: true,
-            isDefault: true,
-          },
+            isDefault: assignedStationId === defaultStationId,
+          })),
         });
 
         return user;
       });
 
-      return {
-        id: createdUser.id,
-        uid: createdUser.uid,
-        email: createdUser.email,
-        firstName: createdUser.firstName,
-        lastName: createdUser.lastName,
-        fullName: `${createdUser.firstName} ${createdUser.lastName}`.trim(),
-        status: UserStatus.ACTIVE,
-        roleId: role.id,
-        roleCode: role.code,
-        roleName: role.name,
-        isRoleActive: role.isActive,
-        isAssigned: true,
-      };
+      return this.getAccessControlUserSummary(createdUser.id, stationId);
     } catch (error: unknown) {
       this.handleUniqueConstraint(
         error,
@@ -479,19 +518,155 @@ export class AccessControlService implements OnModuleInit {
       });
     });
 
-    return {
-      id: targetUser.id,
-      uid: targetUser.uid,
-      email: targetUser.email,
-      firstName: targetUser.firstName,
-      lastName: targetUser.lastName,
-      fullName: `${targetUser.firstName} ${targetUser.lastName}`.trim(),
-      roleId: role.id,
-      roleCode: role.code,
-      roleName: role.name,
-      isAssigned: true,
-      isRoleActive: role.isActive,
-    };
+    return this.getAccessControlUserSummary(targetUser.id, stationId);
+  }
+
+  async assignUserStations(
+    actor: AuthenticatedUser,
+    targetUserId: string,
+    stationIds: string[],
+    requestedRoleId?: string,
+  ) {
+    const currentStationId = this.getStationId(actor);
+    const normalizedStationIds = this.normalizeStationIds(stationIds);
+
+    const [targetUser, existingAccesses] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: targetUserId },
+        select: {
+          id: true,
+        },
+      }),
+      this.prisma.userStationAccess.findMany({
+        where: {
+          userId: targetUserId,
+          isActive: true,
+          station: {
+            isActive: true,
+          },
+        },
+        select: {
+          stationId: true,
+          roleId: true,
+          isDefault: true,
+        },
+        orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+      }),
+    ]);
+
+    if (!targetUser) {
+      throw new NotFoundException('User not found');
+    }
+
+    const effectiveRoleId =
+      requestedRoleId?.trim() || existingAccesses[0]?.roleId || null;
+
+    if (normalizedStationIds.length > 0 && !effectiveRoleId) {
+      throw new BadRequestException(
+        'Assign a role before granting station access',
+      );
+    }
+
+    if (normalizedStationIds.length > 0) {
+      const [role, stations] = await Promise.all([
+        this.prisma.role.findUnique({
+          where: { id: effectiveRoleId! },
+          select: {
+            id: true,
+            isActive: true,
+          },
+        }),
+        this.prisma.station.findMany({
+          where: {
+            id: {
+              in: normalizedStationIds,
+            },
+            isActive: true,
+          },
+          select: {
+            id: true,
+          },
+        }),
+      ]);
+
+      if (!role || !role.isActive) {
+        throw new NotFoundException('Role not found');
+      }
+
+      if (stations.length !== normalizedStationIds.length) {
+        throw new NotFoundException(
+          'One or more selected stations were not found',
+        );
+      }
+    }
+
+    const defaultStationId =
+      normalizedStationIds.length === 0
+        ? null
+        : existingAccesses.find(
+            (entry) =>
+              entry.isDefault && normalizedStationIds.includes(entry.stationId),
+          )?.stationId ??
+          (normalizedStationIds.includes(currentStationId)
+            ? currentStationId
+            : normalizedStationIds[0]);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.userStationAccess.updateMany({
+        where: {
+          userId: targetUserId,
+        },
+        data: {
+          isActive: false,
+          isDefault: false,
+        },
+      });
+
+      for (const assignedStationId of normalizedStationIds) {
+        await tx.userStationAccess.upsert({
+          where: {
+            userId_stationId: {
+              userId: targetUserId,
+              stationId: assignedStationId,
+            },
+          },
+          update: {
+            roleId: effectiveRoleId!,
+            isActive: true,
+            isDefault: assignedStationId === defaultStationId,
+          },
+          create: {
+            userId: targetUserId,
+            stationId: assignedStationId,
+            roleId: effectiveRoleId!,
+            isActive: true,
+            isDefault: assignedStationId === defaultStationId,
+          },
+        });
+      }
+
+      await tx.authSession.updateMany({
+        where:
+          normalizedStationIds.length > 0
+            ? {
+                userId: targetUserId,
+                activeStationId: {
+                  notIn: normalizedStationIds,
+                },
+              }
+            : {
+                userId: targetUserId,
+                activeStationId: {
+                  not: null,
+                },
+              },
+        data: {
+          activeStationId: null,
+        },
+      });
+    });
+
+    return this.getAccessControlUserSummary(targetUserId, currentStationId);
   }
 
   async listModules(systemType?: SystemType) {
@@ -647,6 +822,62 @@ export class AccessControlService implements OnModuleInit {
     return this.getRolePermissions(roleId);
   }
 
+  private async getAccessControlUserSummary(
+    userId: string,
+    contextStationId: string,
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        uid: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        status: true,
+        stationAccesses: {
+          where: {
+            isActive: true,
+            station: {
+              isActive: true,
+            },
+          },
+          include: {
+            station: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                timezone: true,
+              },
+            },
+            role: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                isActive: true,
+              },
+            },
+          },
+          orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return this.mapAccessControlUser(
+      {
+        ...user,
+        stationAccesses: user.stationAccesses as UserStationAccessSummary[],
+      },
+      contextStationId,
+    );
+  }
+
   private async syncModuleCatalog() {
     for (const definition of ACCESS_CONTROL_MODULES) {
       await this.prisma.appModule.upsert({
@@ -763,6 +994,43 @@ export class AccessControlService implements OnModuleInit {
     };
   }
 
+  private mapAccessControlUser(
+    user: AccessControlUserSummary,
+    contextStationId: string,
+  ) {
+    const primaryAccess =
+      user.stationAccesses.find((entry) => entry.stationId === contextStationId) ??
+      user.stationAccesses[0] ??
+      null;
+
+    const assignedStations = user.stationAccesses.map((entry) => ({
+      stationId: entry.stationId,
+      stationCode: entry.station.code,
+      stationName: entry.station.name,
+      timezone: entry.station.timezone,
+      isDefault: entry.isDefault,
+    }));
+
+    return {
+      id: user.id,
+      uid: user.uid,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      fullName: `${user.firstName} ${user.lastName}`.trim(),
+      status: user.status,
+      roleId: primaryAccess?.roleId ?? null,
+      roleCode: primaryAccess?.role.code ?? null,
+      roleName: primaryAccess?.role.name ?? null,
+      isRoleActive: primaryAccess?.role.isActive ?? false,
+      isAssigned: user.stationAccesses.some(
+        (entry) => entry.stationId === contextStationId,
+      ),
+      assignedStationCount: assignedStations.length,
+      assignedStations,
+    };
+  }
+
   private groupModulesBySystem(
     modules: Array<
       | {
@@ -843,6 +1111,29 @@ export class AccessControlService implements OnModuleInit {
     }
 
     return user.activeStationId;
+  }
+
+  private normalizeStationIds(
+    stationIds?: string[],
+    fallbackStationId?: string,
+  ) {
+    const normalized = Array.from(
+      new Set(
+        (stationIds ?? [])
+          .map((entry) => entry.trim())
+          .filter((entry) => entry.length > 0),
+      ),
+    );
+
+    if (normalized.length > 0) {
+      return normalized;
+    }
+
+    if (fallbackStationId && fallbackStationId.trim().length > 0) {
+      return [fallbackStationId.trim()];
+    }
+
+    return [];
   }
 
   private async resolveRoleCode(

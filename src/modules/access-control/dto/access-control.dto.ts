@@ -84,6 +84,17 @@ export class AssignUserRoleDto {
   roleId!: string;
 }
 
+export class AssignUserStationsDto {
+  @IsArray()
+  @ArrayMaxSize(100)
+  @IsUUID('4', { each: true })
+  stationIds!: string[];
+
+  @IsOptional()
+  @IsUUID()
+  roleId?: string;
+}
+
 export class CreateAccessUserDto {
   @IsString()
   @IsNotEmpty()
@@ -115,4 +126,10 @@ export class CreateAccessUserDto {
 
   @IsUUID()
   roleId!: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @IsUUID('4', { each: true })
+  stationIds?: string[];
 }
