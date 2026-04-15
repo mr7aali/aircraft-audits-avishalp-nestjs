@@ -27,6 +27,7 @@ import { CommonModule } from './common/common.module.js';
 import { AdminDashboardModule } from './modules/admin-dashboard/admin-dashboard.module.js';
 import { HiddenObjectAuditsModule } from './modules/hidden-object-audits/hidden-object-audits.module.js';
 import { AccessControlModule } from './modules/access-control/access-control.module.js';
+import { FlightsModule } from './modules/flights/flights.module.js';
 
 @Module({
   imports: [
@@ -128,6 +129,7 @@ import { AccessControlModule } from './modules/access-control/access-control.mod
     AdminDashboardModule,
     HiddenObjectAuditsModule,
     AccessControlModule,
+    FlightsModule,
   ],
   providers: [
     {

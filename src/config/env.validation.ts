@@ -18,6 +18,14 @@ export const envValidationSchema = Joi.object({
   REDIS_HOST: Joi.string().default('localhost'),
   REDIS_PORT: Joi.number().default(6379),
   REDIS_PASSWORD: Joi.string().allow('').optional(),
+  FLIGHTS_CACHE_TTL_SECONDS: Joi.number().min(60).default(300),
+  FLIGHTS_PROVIDER_TIMEOUT_MS: Joi.number().min(1000).default(15000),
+  FLIGHTS_PROVIDER_LIMIT: Joi.number().min(1).max(100).default(100),
+  AVIATIONSTACK_API_KEY: Joi.string().allow('').optional(),
+  AVIATIONSTACK_BASE_URL: Joi.string()
+    .uri({ scheme: [/https?/] })
+    .default('http://api.aviationstack.com/v1/flights'),
+  AVIATIONSTACK_ACTIVE_STATUS: Joi.string().default('active'),
   MAIL_FROM: Joi.string().email().default('noreply@example.com'),
   MAIL_HOST: Joi.string().default('localhost'),
   MAIL_PORT: Joi.number().default(1025),
