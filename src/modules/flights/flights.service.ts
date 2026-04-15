@@ -372,6 +372,9 @@ export class FlightsService implements OnModuleDestroy {
     payload: CachedStationFlights,
     source: 'cache' | 'origin',
   ) {
+    const ttlSeconds = this.getCacheTtlSeconds();
+    const remainingSeconds = this.getRemainingSeconds(payload.expiresAt);
+
     return {
       stationId: payload.stationId,
       stationCode: payload.stationCode,
@@ -382,9 +385,11 @@ export class FlightsService implements OnModuleDestroy {
       totalFlights: payload.totalFlights,
       cache: {
         source,
-        ttlSeconds: this.getCacheTtlSeconds(),
+        ttlSeconds,
+        remainingSeconds,
         fetchedAt: payload.fetchedAt,
         expiresAt: payload.expiresAt,
+        serverTime: new Date().toISOString(),
       },
     };
   }
@@ -488,6 +493,16 @@ export class FlightsService implements OnModuleDestroy {
       return 300;
     }
     return Math.max(60, Math.trunc(configured));
+  }
+
+  private getRemainingSeconds(expiresAtIso: string) {
+    const expiresAtMs = Date.parse(expiresAtIso);
+    if (Number.isNaN(expiresAtMs)) {
+      return this.getCacheTtlSeconds();
+    }
+
+    const remainingMs = Math.max(0, expiresAtMs - Date.now());
+    return Math.max(0, Math.ceil(remainingMs / 1000));
   }
 
   private resolveLimit(limit?: number) {
