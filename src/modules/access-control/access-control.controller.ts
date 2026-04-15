@@ -17,6 +17,7 @@ import { AuthenticatedUser } from '../../common/types/authenticated-user.type.js
 import {
   AccessControlListQueryDto,
   AssignUserRoleDto,
+  AssignUserStationsDto,
   CreateAccessUserDto,
   CreateRoleDto,
   UpdateRoleDto,
@@ -85,6 +86,21 @@ export class AccessControlController {
     @Body() dto: AssignUserRoleDto,
   ) {
     return this.accessControlService.assignUserRole(user, id, dto.roleId);
+  }
+
+  @Patch('users/:id/stations')
+  @RequirePermission(MODULE_CODES.ADMIN_DASHBOARD_ROLE_MANAGEMENT, 'edit')
+  assignUserStations(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: AssignUserStationsDto,
+  ) {
+    return this.accessControlService.assignUserStations(
+      user,
+      id,
+      dto.stationIds,
+      dto.roleId,
+    );
   }
 
   @Get('modules')
