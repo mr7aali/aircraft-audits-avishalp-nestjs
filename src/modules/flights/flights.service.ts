@@ -157,26 +157,50 @@ export class FlightsService implements OnModuleDestroy {
         infer: true,
       }) ?? 'active';
 
-    const firstAttempt = await this.requestProvider({
-      stationCode,
-      limit,
-      flightStatus: activeStatus.trim() || undefined,
-    });
+    const [arrivalFlights, departureFlights] = await Promise.all([
+      this.requestProvider({
+        stationCode,
+        limit,
+        direction: 'arrival',
+        flightStatus: activeStatus.trim() || undefined,
+      }),
+      this.requestProvider({
+        stationCode,
+        limit,
+        direction: 'departure',
+        flightStatus: activeStatus.trim() || undefined,
+      }),
+    ]);
 
-    if (firstAttempt.length > 0) {
-      return firstAttempt;
+    if (arrivalFlights.length > 0 || departureFlights.length > 0) {
+      return [...arrivalFlights, ...departureFlights];
     }
 
-    return this.requestProvider({ stationCode, limit });
+    const [fallbackArrivalFlights, fallbackDepartureFlights] = await Promise.all([
+      this.requestProvider({
+        stationCode,
+        limit,
+        direction: 'arrival',
+      }),
+      this.requestProvider({
+        stationCode,
+        limit,
+        direction: 'departure',
+      }),
+    ]);
+
+    return [...fallbackArrivalFlights, ...fallbackDepartureFlights];
   }
 
   private async requestProvider({
     stationCode,
     limit,
+    direction,
     flightStatus,
   }: {
     stationCode: string;
     limit: number;
+    direction: 'arrival' | 'departure';
     flightStatus?: string;
   }) {
     const apiKey =
@@ -199,7 +223,10 @@ export class FlightsService implements OnModuleDestroy {
 
     const url = new URL(baseUrl);
     url.searchParams.set('access_key', apiKey.trim());
-    url.searchParams.set('arr_iata', stationCode);
+    url.searchParams.set(
+      direction === 'arrival' ? 'arr_iata' : 'dep_iata',
+      stationCode,
+    );
     url.searchParams.set('limit', String(limit));
 
     if ((flightStatus?.trim().length ?? 0) > 0) {
