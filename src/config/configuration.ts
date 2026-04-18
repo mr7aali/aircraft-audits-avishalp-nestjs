@@ -20,6 +20,18 @@ export default () => ({
     port: Number(process.env.REDIS_PORT ?? 6379),
     password: process.env.REDIS_PASSWORD ?? '',
   },
+  flights: {
+    cacheTtlSeconds: Number(process.env.FLIGHTS_CACHE_TTL_SECONDS ?? 300),
+    providerTimeoutMs: Number(process.env.FLIGHTS_PROVIDER_TIMEOUT_MS ?? 15000),
+    providerLimit: Number(process.env.FLIGHTS_PROVIDER_LIMIT ?? 100),
+  },
+  aviationstack: {
+    apiKey: process.env.AVIATIONSTACK_API_KEY ?? '',
+    baseUrl:
+      process.env.AVIATIONSTACK_BASE_URL ??
+      'http://api.aviationstack.com/v1/flights',
+    activeStatus: process.env.AVIATIONSTACK_ACTIVE_STATUS ?? 'active',
+  },
   mail: {
     from: process.env.MAIL_FROM ?? 'noreply@example.com',
     host: process.env.MAIL_HOST ?? 'localhost',
