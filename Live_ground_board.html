@@ -1080,6 +1080,10 @@
             SYD: 'YSSY', MEL: 'YMML', BNE: 'YBBN', AKL: 'NZAA',
         };
 
+        const DISPLAY_DASH = '—';
+        const LIVE_REFRESH_MS = 30000;
+        const DEMO_REFRESH_MS = 10000;
+
         let allFlights = [];
         let selectedId = null;
         let activeFilter = 'all';
@@ -1122,6 +1126,41 @@
             return null;
         }
 
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, char => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+            }[char]));
+        }
+
+        function safeText(value, fallback = DISPLAY_DASH) {
+            if (value === null || value === undefined || value === '') return fallback;
+            return escapeHtml(value);
+        }
+
+        function normalizeDelay(value) {
+            const parsed = Number(value);
+            return Number.isFinite(parsed) ? parsed : 0;
+        }
+
+        function airportCode(airport) {
+            return airport?.iata || airport?.icao || DISPLAY_DASH;
+        }
+
+        function airportName(airport) {
+            return airport?.name || DISPLAY_DASH;
+        }
+
+        function buildFlightId(parts) {
+            return parts
+                .filter(Boolean)
+                .join('-')
+                .replace(/[^a-zA-Z0-9_-]+/g, '-');
+        }
+
         // ─── FILTERS ───
         function setFilter(f, btn) {
             activeFilter = f;
@@ -1144,22 +1183,22 @@
             return isNaN(d.getTime()) ? null : d;
         }
 
-        function fmt(val) {
+        function fmt(val, fallback = DISPLAY_DASH) {
             const d = parseTS(val);
-            if (!d) return '—';
+            if (!d) return fallback;
             return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         }
 
-        function fmtFull(val) {
+        function fmtFull(val, fallback = DISPLAY_DASH) {
             const d = parseTS(val);
-            if (!d) return '—';
+            if (!d) return fallback;
             return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
         }
 
         function groundMins(f) {
             const land = parseTS(f._landedAt);
             if (!land) return null;
-            const end = f._departedAt ? (parseTS(f._departedAt) || new Date()) : new Date();
+            const end = parseTS(f._departedAt) || new Date();
             const mins = Math.round((end - land) / 60000);
             return mins >= 0 ? mins : null;
         }
@@ -1180,6 +1219,86 @@
         function statusLabel(s) {
             if (s === 'on-ground') return 'On Ground';
             return s.charAt(0).toUpperCase() + s.slice(1);
+        }
+
+        function cardEventLabel(f) {
+            if (f._direction === 'departure') return f._status === 'departed' ? 'Departed' : 'STD';
+            return f._status === 'approaching' ? 'ETA' : 'Landed';
+        }
+
+        function cardEventTime(f) {
+            if (f._direction === 'departure') {
+                return fmt(f._status === 'departed' ? f._departedAt : f._scheduledDep);
+            }
+            return fmt(f._status === 'approaching' ? f._scheduledArr : f._landedAt);
+        }
+
+        function cardFooterText(f) {
+            if (f._status === 'departed') return 'Dep. ' + fmt(f._departedAt);
+            if (f._direction === 'departure') return 'Awaiting departure';
+            return f._status === 'approaching' ? 'Awaiting arrival' : 'On ground';
+        }
+
+        function buildTimelineSteps(f, gm, delay) {
+            const hasLanding = !!parseTS(f._landedAt);
+            const hasDeparture = !!parseTS(f._departedAt);
+
+            if (f._direction === 'departure') {
+                return [
+                    {
+                        label: 'Scheduled Out',
+                        time: fmt(f._scheduledDep, 'Pending'),
+                        note: f.dest !== DISPLAY_DASH ? 'To ' + f.dest : 'Destination not available',
+                        done: !!parseTS(f._scheduledDep),
+                        active: false,
+                    },
+                    {
+                        label: 'At Gate',
+                        time: f.gate !== DISPLAY_DASH ? 'Gate ' + f.gate : 'Gate pending',
+                        note: f.terminal !== DISPLAY_DASH ? 'Terminal ' + f.terminal : 'Terminal pending',
+                        done: hasDeparture,
+                        active: !hasDeparture && f._status === 'on-ground',
+                    },
+                    {
+                        label: 'Departed',
+                        time: fmt(f._departedAt, 'Pending'),
+                        note: hasDeparture ? (delay > 0 ? '+' + delay + ' min delay' : 'On schedule') : 'Awaiting departure',
+                        done: hasDeparture,
+                        active: false,
+                    },
+                ];
+            }
+
+            return [
+                {
+                    label: 'Inbound',
+                    time: f._scheduledArr ? 'Scheduled: ' + fmt(f._scheduledArr) : 'Inbound',
+                    note: f.origin !== DISPLAY_DASH ? 'From ' + f.origin : 'Origin not available',
+                    done: hasLanding,
+                    active: f._status === 'approaching',
+                },
+                {
+                    label: 'Landed',
+                    time: fmt(f._landedAt, 'Pending'),
+                    note: f.airport + (f.gate !== DISPLAY_DASH ? ' · Gate ' + f.gate : ''),
+                    done: hasLanding,
+                    active: f._status === 'landed',
+                },
+                {
+                    label: 'On Ground',
+                    time: hasLanding ? (fmt(f._landedAt) + ' → ' + (hasDeparture ? fmt(f._departedAt) : 'now')) : 'Pending',
+                    note: gm !== null ? gm + ' min since landing' : 'Awaiting touchdown',
+                    done: hasDeparture,
+                    active: f._status === 'on-ground',
+                },
+                {
+                    label: 'Next Leg',
+                    time: fmt(f._departedAt, 'Not linked'),
+                    note: hasDeparture ? (delay > 0 ? '+' + delay + ' min delay' : 'On schedule') : 'Outbound leg is only shown when the API returns it.',
+                    done: hasDeparture,
+                    active: false,
+                },
+            ];
         }
 
         // ─── CARDS ───
@@ -1205,18 +1324,18 @@
                 const sel = selectedId === f._id ? 'selected' : '';
                 return `<div class="fcard ${sel}" onclick="selectFlight('${f._id}')">
       <div class="fcard-head">
-        <div><div class="fcard-flight">${f.flight}</div><div class="fcard-airline">${f.airline}</div></div>
+        <div><div class="fcard-flight">${safeText(f.flight)}</div><div class="fcard-airline">${safeText(f.airline)}</div></div>
         <span class="status-pill ${statusClass(f._status)}">${statusLabel(f._status)}</span>
       </div>
       <div class="fcard-rows">
-        <div class="fcard-row"><span class="fcard-lbl">Reg.</span><span class="fcard-val">${f.reg}</span></div>
-        <div class="fcard-row"><span class="fcard-lbl">Airport</span><span class="fcard-val">${f.airport}</span></div>
-        <div class="fcard-row"><span class="fcard-lbl">Gate</span><span class="fcard-val">${f.gate}</span></div>
-        <div class="fcard-row"><span class="fcard-lbl">Landed</span><span class="fcard-val">${fmt(f._landedAt)}</span></div>
+        <div class="fcard-row"><span class="fcard-lbl">Reg.</span><span class="fcard-val">${safeText(f.reg)}</span></div>
+        <div class="fcard-row"><span class="fcard-lbl">Airport</span><span class="fcard-val">${safeText(f.airport)}</span></div>
+        <div class="fcard-row"><span class="fcard-lbl">Gate</span><span class="fcard-val">${safeText(f.gate)}</span></div>
+        <div class="fcard-row"><span class="fcard-lbl">${cardEventLabel(f)}</span><span class="fcard-val">${cardEventTime(f)}</span></div>
       </div>
       ${gm !== null
                         ? `<div class="ground-timer"><span class="timer-label" style="color:${tColor};">${gm}m</span><div class="timer-track"><div class="timer-fill" style="width:${pct}%;background:${tColor};"></div></div><span class="timer-note">on ground</span></div>`
-                        : `<div class="ground-timer"><span style="font-size:11px;font-family:var(--mono);color:var(--muted);">${f._status === 'departed' ? 'Dep. ' + fmt(f._departedAt) : 'Awaiting arrival'}</span></div>`
+                        : `<div class="ground-timer"><span style="font-size:11px;font-family:var(--mono);color:var(--muted);">${cardFooterText(f)}</span></div>`
                     }
     </div>`;
             }).join('');
@@ -1231,27 +1350,24 @@
 
         function renderAudit(f) {
             const gm = groundMins(f);
-            const delay = f._depDelay || 0;
-            const steps = [
-                { label: 'Approach', time: f._scheduledArr ? 'Scheduled: ' + fmt(f._scheduledArr) : 'Inbound', note: f.origin && f.origin !== '—' ? 'From ' + f.origin : '', done: true, active: f._status === 'approaching' },
-                { label: 'Landed', time: fmt(f._landedAt) || 'Pending', note: f.airport + (f.gate !== '—' ? ' · Gate ' + f.gate : ''), done: !!parseTS(f._landedAt), active: f._status === 'landed' },
-                { label: 'On Ground', time: parseTS(f._landedAt) ? (fmt(f._landedAt) + ' → ' + (parseTS(f._departedAt) ? fmt(f._departedAt) : 'now')) : '—', note: gm !== null ? gm + ' min turnaround' : 'Ongoing', done: f._status === 'departed', active: f._status === 'on-ground' },
-                { label: 'Departed', time: fmt(f._departedAt) || 'Pending', note: delay > 0 ? '+' + delay + ' min delay' : (parseTS(f._departedAt) ? 'On schedule' : 'Awaiting departure'), done: !!parseTS(f._departedAt), active: false },
-            ];
+            const delay = f._direction === 'arrival' ? (f._arrDelay || 0) : (f._depDelay || 0);
+            const delayLabel = f._direction === 'arrival' ? 'Arrival delay' : 'Departure delay';
+            const scheduledLabel = f._direction === 'arrival' ? 'Sched. arrival' : 'Sched. departure';
+            const steps = buildTimelineSteps(f, gm, delay);
             document.getElementById('auditEmpty').style.display = 'none';
             const content = document.getElementById('auditContent');
             content.style.display = 'block';
             content.innerHTML = `<div class="audit-content">
     <div class="audit-header-sec">
       <div class="plane-avatar"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg></div>
-      <div><div class="audit-flight-name">${f.flight}</div><div class="audit-flight-sub">${f.airline} · ${f.aircraftType}</div></div>
+      <div><div class="audit-flight-name">${safeText(f.flight)}</div><div class="audit-flight-sub">${safeText(f.airline)} · ${safeText(f.aircraftType)}</div></div>
       <button class="close-btn" onclick="closeAudit()">close ×</button>
     </div>
     <div class="metrics-grid">
       <div class="mcard"><div class="mcard-lbl">Ground time</div><div class="mcard-val" style="color:${gm !== null ? timerColor(gm) : 'var(--muted)'}">${gm !== null ? gm : '—'}<span class="mcard-unit">${gm !== null ? 'min' : ''}</span></div></div>
-      <div class="mcard"><div class="mcard-lbl">Delay</div><div class="mcard-val" style="color:${delay > 15 ? '#ef4444' : '#22c55e'}">${delay > 0 ? '+' + delay : '0'}<span class="mcard-unit">min</span></div></div>
-      <div class="mcard"><div class="mcard-lbl">Landed</div><div class="mcard-val" style="font-size:18px;">${fmt(f._landedAt) || '—'}</div></div>
-      <div class="mcard"><div class="mcard-lbl">Departed</div><div class="mcard-val" style="font-size:18px;">${fmt(f._departedAt) || '—'}</div></div>
+      <div class="mcard"><div class="mcard-lbl">${delayLabel}</div><div class="mcard-val" style="color:${delay > 15 ? '#ef4444' : '#22c55e'}">${delay > 0 ? '+' + delay : '0'}<span class="mcard-unit">min</span></div></div>
+      <div class="mcard"><div class="mcard-lbl">Landed</div><div class="mcard-val" style="font-size:18px;">${fmt(f._landedAt)}</div></div>
+      <div class="mcard"><div class="mcard-lbl">Departed</div><div class="mcard-val" style="font-size:18px;">${fmt(f._departedAt)}</div></div>
     </div>
     <div><div class="tl-section-title">Ground event timeline</div>
     <div class="timeline">${steps.map(s => `
@@ -1259,24 +1375,39 @@
         <div class="tl-node ${s.done ? 'done' : s.active ? 'active' : ''}"><div class="tl-node-inner"></div></div>
         <div class="tl-connector"></div>
         <div class="tl-step-head">
-          <span class="tl-step-label" style="color:${s.active ? '#f59e0b' : s.done ? '#f0f2f7' : '#6b7280'}">${s.label}</span>
+          <span class="tl-step-label" style="color:${s.active ? '#f59e0b' : s.done ? '#f0f2f7' : '#6b7280'}">${safeText(s.label)}</span>
           ${s.active ? '<span class="tl-live-tag">live</span>' : ''}
         </div>
-        <div class="tl-step-time">${s.time}</div>
-        <div class="tl-step-note">${s.note}</div>
+        <div class="tl-step-time">${safeText(s.time)}</div>
+        <div class="tl-step-note">${safeText(s.note)}</div>
       </div>`).join('')}</div></div>
-    <div><div class="tl-section-title">Aircraft details</div>
+    <div><div class="tl-section-title">Aircraft &amp; route details</div>
     <table class="details-table">
-      <tr><td class="dl">Registration</td><td class="dv">${f.reg}</td></tr>
-      <tr><td class="dl">Ship no.</td><td class="dv">${f.shipNo}</td></tr>
-      <tr><td class="dl">Aircraft type</td><td class="dv">${f.aircraftType}</td></tr>
-      <tr><td class="dl">Airport</td><td class="dv">${f.airport}</td></tr>
-      <tr><td class="dl">Gate</td><td class="dv">${f.gate}</td></tr>
-      <tr><td class="dl">Terminal</td><td class="dv">${f.terminal}</td></tr>
-      <tr><td class="dl">Origin</td><td class="dv">${f.origin}</td></tr>
-      <tr><td class="dl">Destination</td><td class="dv">${f.dest}</td></tr>
-      <tr><td class="dl">IATA / ICAO</td><td class="dv">${f.iata} / ${f.icao}</td></tr>
+      <tr><td class="dl">Flight</td><td class="dv">${safeText(f.flight)}</td></tr>
+      <tr><td class="dl">Airline</td><td class="dv">${safeText(f.airline)}</td></tr>
+      <tr><td class="dl">Direction</td><td class="dv">${safeText(f._direction)}</td></tr>
+      <tr><td class="dl">IATA / ICAO</td><td class="dv">${safeText(f.iata)} / ${safeText(f.icao)}</td></tr>
+      <tr><td class="dl">Registration</td><td class="dv" style="color:${f.reg === DISPLAY_DASH ? 'var(--muted)' : 'var(--text)'}">${safeText(f.reg)}</td></tr>
+      <tr><td class="dl">Mode-S / Ship</td><td class="dv" style="color:${f.shipNo === DISPLAY_DASH ? 'var(--muted)' : 'var(--text)'}">${safeText(f.shipNo)}</td></tr>
+      <tr><td class="dl">Aircraft type</td><td class="dv">${safeText(f.aircraftType)}</td></tr>
+      <tr><td class="dl">Airport</td><td class="dv" style="color:${f.airport === DISPLAY_DASH ? 'var(--muted)' : 'var(--text)'}">${safeText(f.airport)}</td></tr>
+      <tr><td class="dl">Gate</td><td class="dv" style="color:${f.gate === DISPLAY_DASH ? 'var(--muted)' : 'var(--text)'}">${safeText(f.gate)}</td></tr>
+      <tr><td class="dl">Terminal</td><td class="dv">${safeText(f.terminal)}</td></tr>
+      <tr><td class="dl">Baggage belt</td><td class="dv">${safeText(f.baggageBelt || DISPLAY_DASH)}</td></tr>
+      <tr><td class="dl">Origin</td><td class="dv">${safeText(f.origin)}${f.originName && f.originName !== DISPLAY_DASH ? ' · ' + safeText(f.originName, '') : ''}</td></tr>
+      <tr><td class="dl">Destination</td><td class="dv">${safeText(f.dest)}${f.destName && f.destName !== DISPLAY_DASH ? ' · ' + safeText(f.destName, '') : ''}</td></tr>
+      <tr><td class="dl">${scheduledLabel}</td><td class="dv">${fmt(f._direction === 'arrival' ? f._scheduledArr : f._scheduledDep)}</td></tr>
+      <tr><td class="dl">Arr. delay</td><td class="dv" style="color:${(f._arrDelay || 0) > 15 ? 'var(--red)' : 'var(--green)'}">${f._arrDelay || 0} min</td></tr>
+      <tr><td class="dl">Dep. delay</td><td class="dv" style="color:${(f._depDelay || 0) > 15 ? 'var(--red)' : 'var(--green)'}">${f._depDelay || 0} min</td></tr>
     </table></div>
+
+    <div>
+      <div class="tl-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+        Raw API data
+        <button onclick="toggleRaw('${f._id}')" style="font-size:10px;font-family:var(--mono);background:transparent;border:1px solid var(--border2);border-radius:4px;color:var(--muted);padding:2px 8px;cursor:pointer;">show / hide</button>
+      </div>
+      <pre id="raw-${f._id}" style="display:none;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:10px;font-family:var(--mono);font-size:10px;color:var(--muted);overflow-x:auto;white-space:pre-wrap;word-break:break-all;max-height:300px;overflow-y:auto;">${safeText(JSON.stringify(rawFlightMap[f._id] || {}, null, 2), '{}')}</pre>
+    </div>
   </div>`;
         }
 
@@ -1287,21 +1418,28 @@
             renderCards();
         }
 
+        function toggleRaw(id) {
+            const el = document.getElementById('raw-' + id);
+            if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+        }
+
         // ─── PARSE ───
         // AeroDataBox time fields can be nested objects like:
         //   { "utc": "2026-04-19 14:32", "local": "2026-04-19 10:32-04:00" }
         // OR plain strings: "2026-04-19 14:32"
-        // This helper safely extracts the best available string
         function extractTime(obj) {
             if (!obj) return null;
             if (typeof obj === 'string') return obj;
-            // prefer local time so display matches the airport timezone
             if (obj.local) return obj.local;
             if (obj.utc) return obj.utc;
             return null;
         }
 
+        // Keep raw flight object alongside for debug panel
+        let rawFlightMap = {};
+
         function parseFlights(raw) {
+            rawFlightMap = {};
             const list = [];
             const process = (arr, dir) => {
                 (arr || []).forEach((f, i) => {
@@ -1309,53 +1447,94 @@
                     const arr2 = f.arrival || {};
                     const isArr = dir === 'arr';
 
-                    // Try every known field name AeroDataBox uses for actual landing/departure times
+                    // ── TIME EXTRACTION ──
+                    // AeroDataBox v2 wraps times as { utc, local } objects
+                    // v1 / some endpoints return plain strings
                     const landedAt = isArr
-                        ? (extractTime(arr2.actualTime) || extractTime(arr2.runwayTime) || extractTime(arr2.scheduledTime) || null)
+                        ? (extractTime(arr2.runwayTime) || extractTime(arr2.actualTime) || null)
                         : null;
 
-                    const departedAt = !isArr
-                        ? (extractTime(dep.actualTime) || extractTime(dep.runwayTime) || null)
-                        : null;
+                    const departedAt = isArr
+                        ? null
+                        : (extractTime(dep.runwayTime) || extractTime(dep.actualTime) || null);
 
-                    const scheduledArr = isArr
-                        ? (extractTime(arr2.scheduledTime) || null)
-                        : (extractTime(dep.scheduledTime) || null);
+                    const scheduledArr = extractTime(arr2.scheduledTime) || null;
+                    const scheduledDep = extractTime(dep.scheduledTime) || null;
 
-                    // Status detection — also use movement.status if top-level status missing
-                    let status = 'approaching';
+                    // ── STATUS ──
                     const sRaw = (f.status || f.movement?.status || '').toLowerCase();
-                    if (sRaw.includes('land') || sRaw.includes('arrived')) status = 'landed';
-                    else if (sRaw.includes('ground') || sRaw.includes('boarding') || sRaw.includes('taxiing')) status = 'on-ground';
-                    else if (sRaw.includes('depart') || sRaw.includes('airborne') || sRaw.includes('en-route')) status = 'departed';
-                    else if (landedAt && !departedAt) status = 'on-ground';
-                    else if (landedAt && departedAt) status = 'departed';
-                    else if (landedAt) status = 'landed';
-
-                    // Validate timestamps — discard unparseable ones
                     const safeLandedAt = parseTS(landedAt) ? landedAt : null;
                     const safeDepartedAt = parseTS(departedAt) ? departedAt : null;
-                    const safeScheduled = parseTS(scheduledArr) ? scheduledArr : null;
+                    const safeScheduledArr = parseTS(scheduledArr) ? scheduledArr : null;
+                    const safeScheduledDep = parseTS(scheduledDep) ? scheduledDep : null;
+
+                    let status = 'approaching';
+                    if (isArr) {
+                        if (sRaw.includes('ground') || sRaw.includes('boarding') || sRaw.includes('taxi')) status = 'on-ground';
+                        else if (sRaw.includes('land') || sRaw.includes('arrived') || safeLandedAt) status = 'landed';
+                        else status = 'approaching';
+                    } else if (sRaw.includes('depart') || sRaw.includes('airborne') || sRaw.includes('en-route') || safeDepartedAt) {
+                        status = 'departed';
+                    } else {
+                        status = 'on-ground';
+                    }
+
+                    // ── AIRCRAFT FIELDS ──
+                    // AeroDataBox puts reg under aircraft.reg OR aircraft.registration
+                    const ac = f.aircraft || {};
+                    const reg = ac.reg || ac.registration || ac.tail || '—';
+                    const shipNo = ac.modeS || ac.serialNo || ac.icao24 || '—';
+                    const acType = ac.model || ac.type || ac.icaoCode || ac.iataCodeLong || '—';
+                    const acImage = ac.image?.url || null;
+
+                    // ── AIRPORT / GATE FIELDS ──
+                    // Both directions: pick whichever side is "this" airport
+                    const thisApt = isArr ? arr2 : dep;
+
+                    const airportIata = airportCode(thisApt.airport);
+                    const gate = thisApt.gate || DISPLAY_DASH;
+                    const terminal = thisApt.terminal || DISPLAY_DASH;
+                    const baggageBelt = arr2.baggageBelt || DISPLAY_DASH;
+
+                    const originIata = airportCode(dep.airport);
+                    const destIata = airportCode(arr2.airport);
+                    const originName = airportName(dep.airport);
+                    const destName = airportName(arr2.airport);
+
+                    const id = buildFlightId([
+                        dir,
+                        f.number || f.iataNumber || 'FL',
+                        ac.reg || ac.registration || ac.tail || 'aircraft',
+                        safeScheduledArr || safeScheduledDep || safeLandedAt || safeDepartedAt || i,
+                    ]);
+
+                    // Store raw object for debug panel
+                    rawFlightMap[id] = f;
 
                     list.push({
-                        _id: (f.number || f.iataNumber || 'FL') + i + dir,
+                        _id: id,
+                        _direction: isArr ? 'arrival' : 'departure',
                         _status: status,
                         _landedAt: safeLandedAt,
                         _departedAt: safeDepartedAt,
-                        _scheduledArr: safeScheduled,
-                        _depDelay: dep.delay || dep.delayTime || 0,
-                        flight: f.number || f.iataNumber || '—',
-                        airline: f.airline?.name || '—',
-                        reg: f.aircraft?.reg || f.aircraft?.registration || f.aircraft?.modeS || '—',
-                        shipNo: f.aircraft?.modeS || f.aircraft?.serialNo || '—',
-                        aircraftType: f.aircraft?.model || f.aircraft?.type || f.aircraft?.icaoCode || '—',
-                        airport: isArr ? (arr2.airport?.iata || arr2.airport?.icao || '—') : (dep.airport?.iata || dep.airport?.icao || '—'),
-                        gate: isArr ? (arr2.gate || dep.gate || '—') : (dep.gate || arr2.gate || '—'),
-                        terminal: isArr ? (arr2.terminal || dep.terminal || '—') : (dep.terminal || arr2.terminal || '—'),
-                        origin: arr2.airport?.iata || dep.airport?.iata || '—',
-                        dest: dep.airport?.iata || arr2.airport?.iata || '—',
-                        iata: f.airline?.iata || '—',
-                        icao: f.airline?.icao || '—',
+                        _scheduledArr: safeScheduledArr,
+                        _scheduledDep: safeScheduledDep,
+                        _depDelay: normalizeDelay(dep.delay || dep.delayTime),
+                        _arrDelay: normalizeDelay(arr2.delay || arr2.delayTime),
+                        flight: f.number || f.iataNumber || DISPLAY_DASH,
+                        airline: f.airline?.name || DISPLAY_DASH,
+                        reg, shipNo, acType, acImage,
+                        aircraftType: acType,
+                        airport: airportIata,
+                        gate,
+                        terminal,
+                        baggageBelt,
+                        origin: originIata,
+                        dest: destIata,
+                        originName,
+                        destName,
+                        iata: f.airline?.iata || DISPLAY_DASH,
+                        icao: f.airline?.icao || DISPLAY_DASH,
                     });
                 });
             };
@@ -1368,6 +1547,7 @@
         function pad(n) { return String(n).padStart(2, '0'); }
         function fmtDate(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
         function fmtTime(d) { return `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+        function fmtApiDateTime(d) { return `${fmtDate(d)}T${fmtTime(d)}`; }
 
         function initDatePicker() {
             document.getElementById('dateIn').value = fmtDate(new Date());
@@ -1380,9 +1560,11 @@
             if (btn) btn.classList.add('active');
             const now = new Date();
             if (preset === 'now') {
-                document.getElementById('dateIn').value = fmtDate(now);
-                document.getElementById('timeFrom').value = fmtTime(new Date(now.getTime() - 90 * 60000));
-                document.getElementById('timeTo').value = fmtTime(new Date(now.getTime() + 3 * 60 * 60000));
+                const start = new Date(now.getTime() - 3 * 60 * 60000);
+                const end = new Date(now.getTime() + 3 * 60 * 60000);
+                document.getElementById('dateIn').value = fmtDate(start);
+                document.getElementById('timeFrom').value = fmtTime(start);
+                document.getElementById('timeTo').value = fmtTime(end);
             } else if (preset === 'morning') { document.getElementById('timeFrom').value = '05:00'; document.getElementById('timeTo').value = '12:00'; }
             else if (preset === 'afternoon') { document.getElementById('timeFrom').value = '12:00'; document.getElementById('timeTo').value = '18:00'; }
             else if (preset === 'evening') { document.getElementById('timeFrom').value = '18:00'; document.getElementById('timeTo').value = '23:59'; }
@@ -1395,9 +1577,12 @@
             const from = document.getElementById('timeFrom').value;
             const to = document.getElementById('timeTo').value;
             if (!date || !from || !to) { document.getElementById('windowNote').textContent = '—'; return; }
-            const d = new Date(date + 'T12:00:00');
+            const start = new Date(date + 'T' + from + ':00');
+            const end = new Date(date + 'T' + to + ':00');
+            if (end < start) end.setDate(end.getDate() + 1);
+            const suffix = fmtDate(end) !== fmtDate(start) ? ' (+1d)' : '';
             document.getElementById('windowNote').textContent =
-                d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }) + '  ' + from + ' → ' + to;
+                start.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }) + '  ' + from + ' → ' + to + suffix;
         }
 
         ['dateIn', 'timeFrom', 'timeTo'].forEach(id => {
@@ -1411,18 +1596,30 @@
             const date = document.getElementById('dateIn').value || fmtDate(new Date());
             const from = document.getElementById('timeFrom').value || '00:00';
             const to = document.getElementById('timeTo').value || '23:59';
-            return { startStr: `${date}T${from}`, endStr: `${date}T${to}` };
+            const start = new Date(date + 'T' + from + ':00');
+            const end = new Date(date + 'T' + to + ':00');
+            if (end < start) end.setDate(end.getDate() + 1);
+            return { startStr: fmtApiDateTime(start), endStr: fmtApiDateTime(end) };
         }
 
         // ─── FETCH ───
         async function fetchFlights() {
             const icao = resolveICAO();
             const apiKey = document.getElementById('apiKey').value.trim();
+            const errEl = document.getElementById('errMsg');
 
-            if (!apiKey) { loadDemo(); return; }
+            if (!apiKey) {
+                if (refreshInterval) {
+                    clearInterval(refreshInterval);
+                    refreshInterval = null;
+                }
+                errEl.style.display = 'none';
+                errEl.textContent = '';
+                loadDemo();
+                return;
+            }
 
             if (!icao) {
-                const errEl = document.getElementById('errMsg');
                 errEl.textContent = 'Please enter a valid airport code (e.g. JFK or KJFK).';
                 errEl.style.display = 'block';
                 return;
@@ -1430,11 +1627,10 @@
 
             const bar = document.getElementById('loadingBar');
             bar.classList.remove('done'); bar.classList.add('active');
-            const errEl = document.getElementById('errMsg');
             errEl.style.display = 'none'; errEl.textContent = '';
 
             const { startStr, endStr } = buildTimeWindow();
-            const url = `https://aerodatabox.p.rapidapi.com/flights/airports/icao/${icao}/${startStr}/${endStr}?withLeg=true&direction=Both&withCancelled=false&withCodeshared=true&withCargo=false&withPrivate=false`;
+            const url = `https://aerodatabox.p.rapidapi.com/flights/airports/icao/${encodeURIComponent(icao)}/${encodeURIComponent(startStr)}/${encodeURIComponent(endStr)}?withLeg=true&direction=Both&withCancelled=false&withCodeshared=true&withCargo=false&withPrivate=false`;
 
             try {
                 const res = await fetch(url, {
@@ -1471,7 +1667,11 @@
                 renderCards();
                 document.getElementById('lastUpdate').textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' · ' + icao;
                 document.getElementById('livePill').style.display = 'flex';
-                if (selectedId) { const f = allFlights.find(x => x._id === selectedId); if (f) renderAudit(f); }
+                if (selectedId) {
+                    const f = allFlights.find(x => x._id === selectedId);
+                    if (f) renderAudit(f);
+                    else closeAudit();
+                }
 
             } catch (e) {
                 console.error('fetchFlights error:', e);
@@ -1487,13 +1687,19 @@
             if (refreshInterval) clearInterval(refreshInterval);
             if (demoInterval) { clearInterval(demoInterval); demoInterval = null; }
             document.getElementById('stopBtn').style.display = 'block';
+            if (!document.getElementById('apiKey').value.trim()) {
+                loadDemo();
+                return;
+            }
             fetchFlights();
-            refreshInterval = setInterval(fetchFlights, 30000);
+            refreshInterval = setInterval(fetchFlights, LIVE_REFRESH_MS);
         }
 
         function stopLive() {
             if (refreshInterval) clearInterval(refreshInterval);
+            if (demoInterval) clearInterval(demoInterval);
             refreshInterval = null;
+            demoInterval = null;
             document.getElementById('stopBtn').style.display = 'none';
             document.getElementById('livePill').style.display = 'none';
             document.getElementById('lastUpdate').textContent = 'Stopped';
@@ -1506,23 +1712,27 @@
             const ago = m => new Date(now - m * 60000).toISOString();
             const ahead = m => new Date(now.getTime() + m * 60000).toISOString();
             allFlights = [
-                { _id: 'BG001', _status: 'on-ground', _landedAt: ago(47), _departedAt: null, _scheduledArr: ago(50), _depDelay: 0, flight: 'BG001', airline: 'Biman Bangladesh', reg: 'S2-AHM', shipNo: 'HM001', aircraftType: 'Boeing 787-8', airport: 'DAC', gate: 'A3', terminal: '1', origin: 'DXB', dest: 'DAC', iata: 'BG', icao: 'BBC' },
-                { _id: 'BG007', _status: 'on-ground', _landedAt: ago(112), _departedAt: null, _scheduledArr: ago(100), _depDelay: 12, flight: 'BG007', airline: 'Biman Bangladesh', reg: 'S2-AJN', shipNo: 'JN007', aircraftType: 'Boeing 737-800', airport: 'DAC', gate: 'B1', terminal: '1', origin: 'CGP', dest: 'DAC', iata: 'BG', icao: 'BBC' },
-                { _id: 'EK582', _status: 'landed', _landedAt: ago(8), _departedAt: null, _scheduledArr: ago(5), _depDelay: 0, flight: 'EK582', airline: 'Emirates', reg: 'A6-EPO', shipNo: 'EPO58', aircraftType: 'Boeing 777-300ER', airport: 'DAC', gate: 'A1', terminal: '1', origin: 'DXB', dest: 'DAC', iata: 'EK', icao: 'UAE' },
-                { _id: 'QR648', _status: 'approaching', _landedAt: null, _departedAt: null, _scheduledArr: ahead(18), _depDelay: 0, flight: 'QR648', airline: 'Qatar Airways', reg: 'A7-BEG', shipNo: 'BEG64', aircraftType: 'Boeing 787-9', airport: 'DAC', gate: 'A2', terminal: '1', origin: 'DOH', dest: 'DAC', iata: 'QR', icao: 'QTR' },
-                { _id: 'SQ445', _status: 'departed', _landedAt: ago(95), _departedAt: ago(12), _scheduledArr: ago(100), _depDelay: 5, flight: 'SQ445', airline: 'Singapore Airlines', reg: '9V-SKB', shipNo: 'SKB44', aircraftType: 'Airbus A350-900', airport: 'DAC', gate: 'B3', terminal: '1', origin: 'SIN', dest: 'DAC', iata: 'SQ', icao: 'SIA' },
-                { _id: 'TG323', _status: 'on-ground', _landedAt: ago(63), _departedAt: null, _scheduledArr: ago(60), _depDelay: 0, flight: 'TG323', airline: 'Thai Airways', reg: 'HS-TGW', shipNo: 'TGW32', aircraftType: 'Boeing 777-300ER', airport: 'DAC', gate: 'D4', terminal: '1', origin: 'BKK', dest: 'DAC', iata: 'TG', icao: 'THA' },
-                { _id: 'BS101', _status: 'departed', _landedAt: ago(75), _departedAt: ago(20), _scheduledArr: ago(80), _depDelay: 0, flight: 'BS101', airline: 'US-Bangla', reg: 'S2-AJV', shipNo: 'JV101', aircraftType: 'ATR 72-600', airport: 'DAC', gate: 'C2', terminal: '2', origin: 'CGP', dest: 'DAC', iata: 'BS', icao: 'UBG' },
-                { _id: 'MH192', _status: 'approaching', _landedAt: null, _departedAt: null, _scheduledArr: ahead(35), _depDelay: 0, flight: 'MH192', airline: 'Malaysia Airlines', reg: '9M-MXE', shipNo: 'MXE19', aircraftType: 'Airbus A330-300', airport: 'DAC', gate: '—', terminal: '1', origin: 'KUL', dest: 'DAC', iata: 'MH', icao: 'MAS' },
+                { _id: 'BG001', _direction: 'arrival', _status: 'on-ground', _landedAt: ago(47), _departedAt: null, _scheduledArr: ago(50), _scheduledDep: null, _depDelay: 0, _arrDelay: 0, flight: 'BG001', airline: 'Biman Bangladesh', reg: 'S2-AHM', shipNo: 'HM001', aircraftType: 'Boeing 787-8', airport: 'DAC', gate: 'A3', terminal: '1', baggageBelt: '2', origin: 'DXB', dest: 'DAC', iata: 'BG', icao: 'BBC' },
+                { _id: 'BG007', _direction: 'arrival', _status: 'on-ground', _landedAt: ago(112), _departedAt: null, _scheduledArr: ago(100), _scheduledDep: null, _depDelay: 0, _arrDelay: 12, flight: 'BG007', airline: 'Biman Bangladesh', reg: 'S2-AJN', shipNo: 'JN007', aircraftType: 'Boeing 737-800', airport: 'DAC', gate: 'B1', terminal: '1', baggageBelt: '4', origin: 'CGP', dest: 'DAC', iata: 'BG', icao: 'BBC' },
+                { _id: 'EK582', _direction: 'arrival', _status: 'landed', _landedAt: ago(8), _departedAt: null, _scheduledArr: ago(5), _scheduledDep: null, _depDelay: 0, _arrDelay: 0, flight: 'EK582', airline: 'Emirates', reg: 'A6-EPO', shipNo: 'EPO58', aircraftType: 'Boeing 777-300ER', airport: 'DAC', gate: 'A1', terminal: '1', baggageBelt: '1', origin: 'DXB', dest: 'DAC', iata: 'EK', icao: 'UAE' },
+                { _id: 'QR648', _direction: 'arrival', _status: 'approaching', _landedAt: null, _departedAt: null, _scheduledArr: ahead(18), _scheduledDep: null, _depDelay: 0, _arrDelay: 0, flight: 'QR648', airline: 'Qatar Airways', reg: 'A7-BEG', shipNo: 'BEG64', aircraftType: 'Boeing 787-9', airport: 'DAC', gate: 'A2', terminal: '1', baggageBelt: DISPLAY_DASH, origin: 'DOH', dest: 'DAC', iata: 'QR', icao: 'QTR' },
+                { _id: 'SQ445', _direction: 'departure', _status: 'departed', _landedAt: ago(95), _departedAt: ago(12), _scheduledArr: null, _scheduledDep: ago(17), _depDelay: 5, _arrDelay: 0, flight: 'SQ445', airline: 'Singapore Airlines', reg: '9V-SKB', shipNo: 'SKB44', aircraftType: 'Airbus A350-900', airport: 'DAC', gate: 'B3', terminal: '1', baggageBelt: DISPLAY_DASH, origin: 'DAC', dest: 'SIN', iata: 'SQ', icao: 'SIA' },
+                { _id: 'TG323', _direction: 'arrival', _status: 'on-ground', _landedAt: ago(63), _departedAt: null, _scheduledArr: ago(60), _scheduledDep: null, _depDelay: 0, _arrDelay: 0, flight: 'TG323', airline: 'Thai Airways', reg: 'HS-TGW', shipNo: 'TGW32', aircraftType: 'Boeing 777-300ER', airport: 'DAC', gate: 'D4', terminal: '1', baggageBelt: '6', origin: 'BKK', dest: 'DAC', iata: 'TG', icao: 'THA' },
+                { _id: 'BS101', _direction: 'departure', _status: 'departed', _landedAt: ago(75), _departedAt: ago(20), _scheduledArr: null, _scheduledDep: ago(20), _depDelay: 0, _arrDelay: 0, flight: 'BS101', airline: 'US-Bangla', reg: 'S2-AJV', shipNo: 'JV101', aircraftType: 'ATR 72-600', airport: 'DAC', gate: 'C2', terminal: '2', baggageBelt: DISPLAY_DASH, origin: 'DAC', dest: 'CGP', iata: 'BS', icao: 'UBG' },
+                { _id: 'MH192', _direction: 'arrival', _status: 'approaching', _landedAt: null, _departedAt: null, _scheduledArr: ahead(35), _scheduledDep: null, _depDelay: 0, _arrDelay: 0, flight: 'MH192', airline: 'Malaysia Airlines', reg: '9M-MXE', shipNo: 'MXE19', aircraftType: 'Airbus A330-300', airport: 'DAC', gate: DISPLAY_DASH, terminal: '1', baggageBelt: DISPLAY_DASH, origin: 'KUL', dest: 'DAC', iata: 'MH', icao: 'MAS' },
             ];
             renderCards();
-            document.getElementById('lastUpdate').textContent = 'Demo · ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            document.getElementById('lastUpdate').textContent = 'Demo mode · ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             document.getElementById('livePill').style.display = 'flex';
             demoInterval = setInterval(() => {
                 renderCards();
-                if (selectedId) { const f = allFlights.find(x => x._id === selectedId); if (f) renderAudit(f); }
-                document.getElementById('lastUpdate').textContent = 'Demo · ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            }, 10000);
+                if (selectedId) {
+                    const f = allFlights.find(x => x._id === selectedId);
+                    if (f) renderAudit(f);
+                    else closeAudit();
+                }
+                document.getElementById('lastUpdate').textContent = 'Demo mode · ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            }, DEMO_REFRESH_MS);
         }
 
         initDatePicker();
