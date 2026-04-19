@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Live Ground Board — Flight Audit System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;500;700;800&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0c10;
+            --bg2: #10141c;
+            --bg3: #161b26;
+            --border: rgba(255, 255, 255, 0.07);
+            --border2: rgba(255, 255, 255, 0.13);
+            --text: #f0f2f7;
+            --muted: #6b7280;
+            --dim: #374151;
+            --green: #22c55e;
+            --green-dim: rgba(34, 197, 94, 0.12);
+            --amber: #f59e0b;
+            --amber-dim: rgba(245, 158, 11, 0.12);
+            --blue: #3b82f6;
+            --blue-dim: rgba(59, 130, 246, 0.12);
+            --purple: #a78bfa;
+            --purple-dim: rgba(167, 139, 250, 0.12);
+            --red: #ef4444;
+            --red-dim: rgba(239, 68, 68, 0.12);
+            --mono: 'JetBrains Mono', monospace;
+            --sans: 'Syne', sans-serif;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body { font-family: var(--sans); background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+
+        header { display: flex; align-items: center; gap: 16px; padding: 20px 32px; border-bottom: 1px solid var(--border); background: var(--bg); position: sticky; top: 0; z-index: 100; }
+
+        .logo { display: flex; align-items: center; gap: 10px; }
+        .logo-icon { width: 36px; height: 36px; border: 1px solid var(--border2); border-radius: 8px; display: flex; align-items: center; justify-content: center; background: var(--bg3); }
+        .logo-text { font-size: 15px; font-weight: 700; letter-spacing: 0.05em; color: var(--text); }
+        .logo-sub { font-size: 11px; color: var(--muted); font-family: var(--mono); letter-spacing: 0.08em; }
+
+        .header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+        .live-pill { display: flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 20px; font-size: 11px; font-family: var(--mono); color: var(--green); background: var(--green-dim); }
+        .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: blink 1.6s ease-in-out infinite; }
+
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+
+        .last-update { font-size: 11px; font-family: var(--mono); color: var(--muted); }
+
+        .config-bar { display: flex; align-items: center; gap: 10px; padding: 14px 32px; background: var(--bg2); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+        .config-bar label { font-size: 11px; font-family: var(--mono); color: var(--muted); white-space: nowrap; }
+        .config-bar input { background: var(--bg3); border: 1px solid var(--border2); border-radius: 6px; color: var(--text); font-family: var(--mono); font-size: 12px; padding: 7px 12px; outline: none; transition: border-color 0.2s; }
+        .config-bar input:focus { border-color: var(--blue); }
+        .config-bar input[type="date"], .config-bar input[type="time"] { color-scheme: dark; }
+        #dateIn { width: 140px; }
+        #timeFrom, #timeTo { width: 90px; }
+        .config-divider { width: 1px; height: 24px; background: var(--border2); flex-shrink: 0; }
+
+        .airport-wrap { position: relative; display: flex; align-items: center; }
+        #airportIn { width: 100px; text-transform: uppercase; padding-right: 28px; }
+        #airportIn.has-match { border-color: var(--green); }
+        #airportIn.no-match { border-color: var(--amber); }
+        .airport-resolved { position: absolute; right: 7px; font-size: 10px; font-family: var(--mono); color: var(--green); pointer-events: none; }
+        .airport-hint { font-size: 11px; font-family: var(--mono); color: var(--amber); display: none; }
+
+        .quick-btns { display: flex; gap: 4px; }
+        .qbtn { background: transparent; border: 1px solid var(--border2); border-radius: 20px; color: var(--muted); font-family: var(--mono); font-size: 10px; padding: 3px 9px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+        .qbtn:hover { color: var(--text); border-color: var(--blue); }
+        .qbtn.active { color: var(--blue); border-color: var(--blue); background: var(--blue-dim); }
+        .window-note { font-size: 11px; font-family: var(--mono); color: var(--muted); padding: 3px 9px; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; white-space: nowrap; }
+
+        .btn-watch { background: var(--blue); color: #fff; border: none; border-radius: 6px; font-family: var(--sans); font-size: 13px; font-weight: 700; padding: 8px 20px; cursor: pointer; letter-spacing: 0.04em; transition: opacity 0.2s, transform 0.1s; }
+        .btn-watch:hover { opacity: 0.88; }
+        .btn-watch:active { transform: scale(0.97); }
+        .btn-stop { background: transparent; color: var(--red); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; font-family: var(--sans); font-size: 12px; padding: 7px 14px; cursor: pointer; display: none; }
+        .btn-stop:hover { background: var(--red-dim); }
+        .err-msg { font-size: 12px; font-family: var(--mono); color: var(--red); flex-basis: 100%; display: none; }
+
+        .filter-bar { display: flex; align-items: center; gap: 8px; padding: 12px 32px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+        .search-box { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: var(--mono); font-size: 12px; padding: 7px 12px; outline: none; width: 220px; transition: border-color 0.2s; }
+        .search-box:focus { border-color: var(--blue); }
+        .fbtns { display: flex; gap: 4px; margin-left: 8px; }
+        .fbtn { background: transparent; border: 1px solid var(--border2); border-radius: 20px; color: var(--muted); font-family: var(--mono); font-size: 11px; padding: 4px 12px; cursor: pointer; transition: all 0.15s; }
+        .fbtn:hover { color: var(--text); }
+        .fbtn.active { border-color: var(--blue); color: var(--blue); background: var(--blue-dim); }
+        .fbtn.f-landed.active { border-color: var(--green); color: var(--green); background: var(--green-dim); }
+        .fbtn.f-onground.active { border-color: var(--amber); color: var(--amber); background: var(--amber-dim); }
+        .fbtn.f-departed.active { border-color: var(--purple); color: var(--purple); background: var(--purple-dim); }
+        .count-badge { font-size: 11px; font-family: var(--mono); color: var(--muted); margin-left: auto; }
+
+        .main { display: grid; grid-template-columns: 1fr 400px; height: calc(100vh - 175px); overflow: hidden; }
+        .cards-area { overflow-y: auto; padding: 24px 24px 24px 32px; scrollbar-width: thin; scrollbar-color: var(--dim) transparent; }
+        .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+        .empty-state { grid-column: 1/-1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 80px 0; color: var(--muted); }
+        .empty-state svg { opacity: 0.3; }
+        .empty-state p { font-family: var(--mono); font-size: 13px; text-align: center; line-height: 1.7; }
+
+        .fcard { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 16px; cursor: pointer; transition: border-color 0.18s, background 0.18s; animation: cardIn 0.3s ease both; position: relative; overflow: hidden; }
+        @keyframes cardIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .fcard:hover { border-color: var(--border2); background: var(--bg3); }
+        .fcard.selected { border-color: var(--blue); background: var(--bg3); }
+        .fcard.selected::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--blue); border-radius: 12px 0 0 12px; }
+        .fcard-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+        .fcard-flight { font-size: 18px; font-weight: 800; letter-spacing: 0.02em; color: var(--text); }
+        .fcard-airline { font-size: 11px; color: var(--muted); margin-top: 2px; font-weight: 400; }
+        .status-pill { font-family: var(--mono); font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.06em; flex-shrink: 0; }
+        .s-approaching { background: var(--purple-dim); color: var(--purple); border: 1px solid rgba(167, 139, 250, 0.25); }
+        .s-landed { background: var(--green-dim); color: var(--green); border: 1px solid rgba(34, 197, 94, 0.25); }
+        .s-onground { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(245, 158, 11, 0.25); }
+        .s-departed { background: var(--blue-dim); color: var(--blue); border: 1px solid rgba(59, 130, 246, 0.25); }
+        .fcard-rows { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+        .fcard-row { display: flex; justify-content: space-between; align-items: center; }
+        .fcard-lbl { font-size: 11px; color: var(--muted); }
+        .fcard-val { font-size: 12px; font-family: var(--mono); color: var(--text); font-weight: 500; }
+        .ground-timer { padding-top: 10px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+        .timer-label { font-size: 13px; font-family: var(--mono); font-weight: 700; min-width: 40px; }
+        .timer-track { flex: 1; height: 3px; background: var(--dim); border-radius: 2px; overflow: hidden; }
+        .timer-fill { height: 3px; border-radius: 2px; transition: width 1s linear; }
+        .timer-note { font-size: 10px; color: var(--muted); font-family: var(--mono); }
+
+        /* AUDIT PANEL */
+        .audit-panel { border-left: 1px solid var(--border); background: var(--bg2); overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--dim) transparent; display: flex; flex-direction: column; }
+        .audit-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; color: var(--muted); padding: 40px; }
+        .audit-empty svg { opacity: 0.2; }
+        .audit-empty p { font-family: var(--mono); font-size: 12px; text-align: center; line-height: 1.6; }
+        .audit-content { padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+        .audit-header-sec { display: flex; align-items: center; gap: 14px; }
+        .plane-avatar { width: 48px; height: 48px; border-radius: 10px; background: var(--blue-dim); border: 1px solid rgba(59, 130, 246, 0.2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .audit-flight-name { font-size: 22px; font-weight: 800; letter-spacing: 0.02em; }
+        .audit-flight-sub { font-size: 12px; font-family: var(--mono); color: var(--muted); margin-top: 3px; }
+        .close-btn { margin-left: auto; background: transparent; border: 1px solid var(--border2); border-radius: 6px; color: var(--muted); font-size: 12px; padding: 5px 10px; cursor: pointer; font-family: var(--mono); flex-shrink: 0; }
+        .close-btn:hover { color: var(--text); border-color: var(--muted); }
+
+        .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .mcard { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+        .mcard-lbl { font-size: 10px; font-family: var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 5px; }
+        .mcard-val { font-size: 22px; font-weight: 800; font-family: var(--mono); }
+        .mcard-unit { font-size: 12px; font-weight: 400; color: var(--muted); margin-left: 3px; }
+
+        .tl-section-title { font-size: 11px; font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 14px; }
+        .timeline { position: relative; padding-left: 28px; }
+        .tl-step { position: relative; padding-bottom: 22px; }
+        .tl-step:last-child { padding-bottom: 0; }
+        .tl-node { position: absolute; left: -28px; top: 3px; width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--dim); background: var(--bg2); display: flex; align-items: center; justify-content: center; z-index: 1; }
+        .tl-node-inner { width: 6px; height: 6px; border-radius: 50%; background: var(--dim); }
+        .tl-node.done { border-color: var(--green); }
+        .tl-node.done .tl-node-inner { background: var(--green); }
+        .tl-node.active { border-color: var(--amber); animation: nodePulse 1.5s ease-in-out infinite; }
+        .tl-node.active .tl-node-inner { background: var(--amber); }
+        @keyframes nodePulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); } 50% { box-shadow: 0 0 0 5px rgba(245, 158, 11, 0); } }
+        .tl-connector { position: absolute; left: -21px; top: 19px; width: 1px; height: calc(100% - 12px); background: var(--border2); }
+        .tl-step:last-child .tl-connector { display: none; }
+        .tl-step-head { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+        .tl-step-label { font-size: 14px; font-weight: 700; letter-spacing: 0.02em; }
+        .tl-live-tag { font-size: 9px; font-family: var(--mono); background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(245, 158, 11, 0.25); padding: 1px 6px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
+        /* NEW: real data tag — green */
+        .tl-real-tag { font-size: 9px; font-family: var(--mono); background: var(--green-dim); color: var(--green); border: 1px solid rgba(34,197,94,0.25); padding: 1px 6px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
+        .tl-step-time { font-size: 12px; font-family: var(--mono); color: var(--muted); white-space: pre-line; }
+        .tl-step-note { font-size: 11px; color: var(--dim); font-family: var(--mono); margin-top: 2px; white-space: pre-line; }
+
+        /* NEW: loading spinner for secondary call */
+        .tl-loading { display: flex; align-items: center; gap: 8px; padding: 10px 0; }
+        .tl-spinner { width: 14px; height: 14px; border: 2px solid var(--border2); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.7s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .tl-loading-text { font-size: 11px; font-family: var(--mono); color: var(--muted); }
+
+        /* NEW: data source banner */
+        .data-source-banner { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 6px; font-size: 11px; font-family: var(--mono); border: 1px solid; }
+        .dsb-real { background: var(--green-dim); border-color: rgba(34,197,94,0.25); color: var(--green); }
+        .dsb-projected { background: var(--amber-dim); border-color: rgba(245,158,11,0.25); color: var(--amber); }
+        .dsb-icon { font-size: 13px; }
+
+        .details-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .details-table td { padding: 8px 0; border-bottom: 1px solid var(--border); }
+        .details-table tr:last-child td { border-bottom: none; }
+        .details-table .dl { color: var(--muted); font-family: var(--mono); font-size: 11px; width: 42%; }
+        .details-table .dv { color: var(--text); font-family: var(--mono); font-weight: 500; }
+
+        .loading-bar { position: fixed; top: 0; left: 0; right: 0; height: 2px; background: var(--blue); transform-origin: left; transform: scaleX(0); transition: transform 0.4s ease; z-index: 200; }
+        .loading-bar.active { transform: scaleX(0.8); }
+        .loading-bar.done { transform: scaleX(1); transition: transform 0.1s; opacity: 0; }
+
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--dim); border-radius: 2px; }
+
+        @media(max-width:768px) {
+            .main { grid-template-columns: 1fr; }
+            .audit-panel { border-left: none; border-top: 1px solid var(--border); height: auto; }
+            header { padding: 14px 16px; }
+            .config-bar, .filter-bar { padding: 10px 16px; }
+            .cards-area { padding: 16px; }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="loading-bar" id="loadingBar"></div>
+
+    <header>
+        <div class="logo">
+            <div class="logo-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+                </svg>
+            </div>
+            <div>
+                <div class="logo-text">GROUNDBOARD</div>
+                <div class="logo-sub">flight audit system</div>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="live-pill" id="livePill" style="display:none;">
+                <div class="live-dot"></div>LIVE
+            </div>
+            <div class="last-update" id="lastUpdate">—</div>
+        </div>
+    </header>
+
+    <div class="config-bar" style="flex-wrap:wrap;gap:10px;">
+        <label>AIRPORT</label>
+        <div class="airport-wrap">
+            <input id="airportIn" type="text" placeholder="JFK or KJFK" maxlength="4" oninput="onAirportInput(this)" style="width:110px;text-transform:uppercase;" />
+            <span class="airport-resolved" id="resolvedLabel"></span>
+        </div>
+        <span class="airport-hint" id="airportHint"></span>
+
+        <div class="config-divider"></div>
+
+        <label>RAPIDAPI KEY</label>
+        <input id="apiKey" type="password" placeholder="Paste your AeroDataBox RapidAPI key…" style="width:250px;" />
+
+        <div class="config-divider"></div>
+
+        <label>DATE</label>
+        <input id="dateIn" type="date" />
+        <label>FROM</label>
+        <input id="timeFrom" type="time" value="00:00" />
+        <label>TO</label>
+        <input id="timeTo" type="time" value="23:59" />
+
+        <div class="quick-btns">
+            <button class="qbtn" onclick="setQuick('now')" id="q-now">Now ±3h</button>
+            <button class="qbtn" onclick="setQuick('morning')" id="q-morning">Morning</button>
+            <button class="qbtn" onclick="setQuick('afternoon')" id="q-afternoon">Afternoon</button>
+            <button class="qbtn" onclick="setQuick('evening')" id="q-evening">Evening</button>
+            <button class="qbtn" onclick="setQuick('allday')" id="q-allday">All day</button>
+        </div>
+
+        <span class="window-note" id="windowNote">—</span>
+        <button class="btn-watch" onclick="startLive()">Watch Live</button>
+        <button class="btn-stop" id="stopBtn" onclick="stopLive()">Stop</button>
+        <span class="err-msg" id="errMsg"></span>
+    </div>
+
+    <div class="filter-bar">
+        <input class="search-box" id="searchIn" type="text" placeholder="Search flight / airline / reg…" oninput="renderCards()" />
+        <div class="fbtns">
+            <button class="fbtn active" id="f-all" onclick="setFilter('all',this)">All</button>
+            <button class="fbtn f-landed" id="f-landed" onclick="setFilter('landed',this)">Landed</button>
+            <button class="fbtn f-onground" id="f-onground" onclick="setFilter('on-ground',this)">On Ground</button>
+            <button class="fbtn f-departed" id="f-departed" onclick="setFilter('departed',this)">Departed</button>
+            <button class="fbtn" id="f-approaching" onclick="setFilter('approaching',this)">Approaching</button>
+        </div>
+        <span class="count-badge" id="countBadge">0 flights</span>
+    </div>
+
+    <div class="main">
+        <div class="cards-area">
+            <div class="cards-grid" id="cardsGrid">
+                <div class="empty-state">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+                    </svg>
+                    <p>Enter any airport code — 3-letter IATA (JFK)<br />or 4-letter ICAO (KJFK) — both work.<br /><br />Demo data loads without an API key.</p>
+                </div>
+            </div>
+        </div>
+        <div class="audit-panel" id="auditPanel">
+            <div class="audit-empty" id="auditEmpty">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    <path d="M9 9h6M9 12h6M9 15h4"/>
+                </svg>
+                <p>Click any flight card<br />to open its audit log.</p>
+            </div>
+            <div id="auditContent" style="display:none;"></div>
+        </div>
+    </div>
+
+    <script>
+    // ─── IATA → ICAO lookup ───
+    const IATA_TO_ICAO = {
+        JFK:'KJFK',LAX:'KLAX',ORD:'KORD',ATL:'KATL',DFW:'KDFW',DEN:'KDEN',SFO:'KSFO',SEA:'KSEA',LAS:'KLAS',MIA:'KMIA',CLT:'KCLT',PHX:'KPHX',IAH:'KIAH',MCO:'KMCO',EWR:'KEWR',MSP:'KMSP',DTW:'KDTW',BOS:'KBOS',PHL:'KPHL',LGA:'KLGA',BWI:'KBWI',SLC:'KSLC',SAN:'KSAN',IAD:'KIAD',DCA:'KDCA',MDW:'KMDW',HNL:'PHNL',ANC:'PANC',PDX:'KPDX',STL:'KSTL',
+        LHR:'EGLL',LGW:'EGKK',STN:'EGSS',LTN:'EGGW',MAN:'EGCC',EDI:'EGPH',CDG:'LFPG',ORY:'LFPO',AMS:'EHAM',FRA:'EDDF',MUC:'EDDM',BER:'EDDB',MAD:'LEMD',BCN:'LEBL',FCO:'LIRF',MXP:'LIMC',ZRH:'LSZH',VIE:'LOWW',CPH:'EKCH',ARN:'ESSA',HEL:'EFHK',OSL:'ENGM',LIS:'LPPT',DUB:'EIDW',ATH:'LGAV',IST:'LTFM',SAW:'LTFJ',BRU:'EBBR',WAW:'EPWA',PRG:'LKPR',BUD:'LHBP',OTP:'LROP',SOF:'LBSF',
+        DXB:'OMDB',AUH:'OMAA',DOH:'OTHH',KWI:'OKBK',BAH:'OBBI',AMM:'OJAI',BEY:'OLBA',TLV:'LLBG',RUH:'OERK',JED:'OEJN',MCT:'OOMS',
+        SIN:'WSSS',KUL:'WMKK',BKK:'VTBS',HKG:'VHHH',ICN:'RKSI',NRT:'RJAA',HND:'RJTT',PEK:'ZBAA',PVG:'ZSPD',CAN:'ZGGG',CTU:'ZUUU',XIY:'ZLXY',DEL:'VIDP',BOM:'VABB',MAA:'VOMM',HYD:'VOHS',BLR:'VOBL',CCU:'VECC',CGP:'VGEG',DAC:'VGHS',CMB:'VCBI',KTM:'VNKT',MNL:'RPLL',CGK:'WIII',DPS:'WADD',KHI:'OPKC',LHE:'OPLA',ISB:'OPIS',
+        ZYL:'VGSY',CXB:'VGCB',JSR:'VGJR',BZL:'VGBR',RJH:'VGRJ',
+        CAI:'HECA',JNB:'FAOR',CPT:'FACT',NBO:'HKJK',ADD:'HAAB',LOS:'DNMM',ACC:'DGAA',CMN:'GMMN',TUN:'DTTA',ALG:'DAAG',
+        YYZ:'CYYZ',YVR:'CYVR',YUL:'CYUL',YYC:'CYYC',YEG:'CYEG',GRU:'SBGR',BOG:'SKBO',LIM:'SPIM',SCL:'SCEL',EZE:'SAEZ',MEX:'MMMX',SYD:'YSSY',MEL:'YMML',BNE:'YBBN',AKL:'NZAA',
+    };
+
+    const DISPLAY_DASH = '—';
+    const LIVE_REFRESH_MS = 30000;
+    const DEMO_REFRESH_MS = 10000;
+    const PROJECTED_TAXI_TO_GATE_MIN = 8;
+    const PROJECTED_TURNAROUND_MIN = 75;
+
+    let allFlights = [];
+    let selectedId = null;
+    let activeFilter = 'all';
+    let refreshInterval = null;
+    let demoInterval = null;
+
+    // ─── Cache for secondary reg calls: reg → {data, fetchedAt} ───
+    const regCache = {};
+    const REG_CACHE_TTL_MS = 60000; // 60s cache per registration
+
+    // ─── AIRPORT INPUT ───
+    function onAirportInput(el) {
+        const val = el.value.toUpperCase().trim();
+        const hint = document.getElementById('airportHint');
+        const resolved = document.getElementById('resolvedLabel');
+        el.value = val;
+        if (val.length === 3 && IATA_TO_ICAO[val]) {
+            el.classList.remove('no-match'); el.classList.add('has-match');
+            resolved.textContent = '→ ' + IATA_TO_ICAO[val]; hint.style.display = 'none';
+        } else if (val.length === 3 && !IATA_TO_ICAO[val]) {
+            el.classList.remove('has-match'); el.classList.add('no-match');
+            resolved.textContent = '';
+            hint.textContent = 'Unknown IATA — try 4-letter ICAO (e.g. KJFK)'; hint.style.display = 'inline';
+        } else if (val.length === 4) {
+            el.classList.remove('has-match','no-match'); resolved.textContent = ''; hint.style.display = 'none';
+        } else {
+            el.classList.remove('has-match','no-match'); resolved.textContent = ''; hint.style.display = 'none';
+        }
+    }
+
+    function resolveICAO() {
+        const val = document.getElementById('airportIn').value.toUpperCase().trim();
+        if (val.length === 3) return IATA_TO_ICAO[val] || null;
+        if (val.length === 4) return val;
+        return null;
+    }
+
+    function escapeHtml(v) {
+        return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+    function safeText(v, fallback = DISPLAY_DASH) {
+        if (v === null || v === undefined || v === '') return fallback;
+        return escapeHtml(v);
+    }
+    function normalizeDelay(v) { const p = Number(v); return Number.isFinite(p) ? p : 0; }
+    function airportCode(a) { return a?.iata || a?.icao || DISPLAY_DASH; }
+    function airportName(a) { return a?.name || DISPLAY_DASH; }
+    function buildFlightId(parts) { return parts.filter(Boolean).join('-').replace(/[^a-zA-Z0-9_-]+/g,'-'); }
+    function hasTime(v) { return !!parseTS(v); }
+    function firstValidTime(...vals) { return vals.find(hasTime) || null; }
+    function timeKey(v) { const d = parseTS(v); return d ? d.toISOString() : ''; }
+
+    function buildTimeSummary(entries, fallback = DISPLAY_DASH) {
+        const seen = new Set(); const lines = [];
+        entries.forEach(([label, value]) => {
+            if (!hasTime(value)) return;
+            const k = timeKey(value);
+            if (!k || seen.has(k)) return;
+            seen.add(k); lines.push(`${label}: ${fmt(value)}`);
+        });
+        return lines.length ? lines.join('\n') : fallback;
+    }
+
+    function addMinutes(v, m) {
+        const b = parseTS(v); if (!b) return null;
+        return new Date(b.getTime() + m * 60000).toISOString();
+    }
+
+    // ─── PROJECTION HELPERS (used ONLY when real data missing) ───
+    function projectedLandingTime(f) { return firstValidTime(f._runwayArr,f._revisedArr,f._predictedArr,f._scheduledArr,f._landedAt); }
+    function projectedGateInTime(f) { return firstValidTime(f._revisedArr,f._landedAt,addMinutes(projectedLandingTime(f),PROJECTED_TAXI_TO_GATE_MIN)); }
+    function projectedNextOutTime(f) {
+        return firstValidTime(f._nextRevisedDep,f._nextPredictedDep,f._nextScheduledDep,
+            addMinutes(projectedGateInTime(f),PROJECTED_TURNAROUND_MIN),
+            addMinutes(projectedLandingTime(f),PROJECTED_TAXI_TO_GATE_MIN+PROJECTED_TURNAROUND_MIN));
+    }
+    function projectedDepartureTime(f) { return firstValidTime(f._runwayDep,f._revisedDep,f._predictedDep,f._scheduledDep,f._departedAt); }
+    function projectedBoardingTime(f) {
+        return firstValidTime(addMinutes(projectedDepartureTime(f),-35),addMinutes(f._scheduledDep,-35),addMinutes(f._revisedDep,-35));
+    }
+    function nextLegTime(f) { return firstValidTime(f._nextRunwayDep,f._nextRevisedDep,f._nextPredictedDep,f._nextScheduledDep); }
+    function arrivalBasisTime(f) { return firstValidTime(f._runwayArr,f._revisedArr,f._predictedArr,f._scheduledArr,f._landedAt); }
+    function departureBasisTime(f) { return firstValidTime(f._runwayDep,f._revisedDep,f._predictedDep,f._scheduledDep,f._departedAt); }
+
+    // ─── FILTERS ───
+    function setFilter(f, btn) {
+        activeFilter = f;
+        document.querySelectorAll('.fbtn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active'); renderCards();
+    }
+
+    // Robust timestamp parser — handles ISO with Z, ISO no tz, space-separated
+    function parseTS(val) {
+        if (!val) return null;
+        if (typeof val !== 'string') return null;
+        const normalized = val.trim().replace(' ','T');
+        const d = new Date(normalized);
+        return isNaN(d.getTime()) ? null : d;
+    }
+
+    function fmt(val, fallback = DISPLAY_DASH) {
+        const d = parseTS(val); if (!d) return fallback;
+        return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    }
+    function fmtFull(val, fallback = DISPLAY_DASH) {
+        const d = parseTS(val); if (!d) return fallback;
+        return d.toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+    }
+
+    function groundMins(f) {
+        const land = parseTS(f._landedAt); if (!land) return null;
+        const end = parseTS(f._departedAt) || new Date();
+        const mins = Math.round((end - land) / 60000);
+        return mins >= 0 ? mins : null;
+    }
+    function timerColor(m) { return m < 45 ? '#22c55e' : m < 90 ? '#f59e0b' : '#ef4444'; }
+    function statusClass(s) { if (s==='landed') return 's-landed'; if (s==='on-ground') return 's-onground'; if (s==='departed') return 's-departed'; return 's-approaching'; }
+    function statusLabel(s) { if (s==='on-ground') return 'On Ground'; return s.charAt(0).toUpperCase()+s.slice(1); }
+    function cardEventLabel(f) { if (f._direction==='departure') return f._status==='departed'?'Departed':'STD'; return f._status==='approaching'?'ETA':'Landed'; }
+    function cardEventTime(f) {
+        if (f._direction==='departure') return fmt(f._status==='departed'?f._departedAt:f._scheduledDep);
+        return fmt(f._status==='approaching'?f._scheduledArr:f._landedAt);
+    }
+    function cardFooterText(f) {
+        if (f._status==='departed') return 'Dep. '+fmt(f._departedAt);
+        if (f._direction==='departure') return 'Awaiting departure';
+        return f._status==='approaching'?'Awaiting arrival':'On ground';
+    }
+
+    // ─── ─── ─── ─── ─── ─── ─── ─── ─── ─── ─── ─── ─── ─── ─── ─── ───
+    // OPTION B: SECONDARY CALL — fetch flights by aircraft registration
+    // Called when user clicks a flight card (inside selectFlight)
+    // Returns enriched next-leg data and patches it onto the flight object
+    // ─── ─── ─── ─── ─── ─── ─── ─── ─── ─── ─── ─── ─── ─── ─── ─── ───
+    async function fetchNextLegByReg(f) {
+        const apiKey = document.getElementById('apiKey').value.trim();
+        // No API key → no secondary call (demo mode)
+        if (!apiKey) return { source: 'none' };
+        // No reg → can't look up
+        const reg = f.reg;
+        if (!reg || reg === DISPLAY_DASH) return { source: 'no-reg' };
+
+        // Cache hit?
+        const cacheKey = reg;
+        const cached = regCache[cacheKey];
+        if (cached && (Date.now() - cached.fetchedAt) < REG_CACHE_TTL_MS) {
+            return enrichFromRegData(f, cached.data);
+        }
+
+        try {
+            // AeroDataBox: GET /flights/reg/{reg}
+            // Returns current + upcoming flights for this registration today
+            const url = `https://aerodatabox.p.rapidapi.com/flights/reg/${encodeURIComponent(reg)}?withAircraftImage=false&withLocation=false`;
+            const res = await fetch(url, {
+                headers: {
+                    'x-rapidapi-host': 'aerodatabox.p.rapidapi.com',
+                    'x-rapidapi-key': apiKey
+                }
+            });
+
+            if (!res.ok) {
+                // 404 = no data for this reg, not an error worth surfacing loudly
+                return { source: 'api-error', status: res.status };
+            }
+
+            const rawText = await res.text();
+            if (!rawText || rawText.trim() === '') return { source: 'empty' };
+
+            let json;
+            try { json = JSON.parse(rawText); } catch { return { source: 'parse-error' }; }
+
+            // Cache result
+            regCache[cacheKey] = { data: json, fetchedAt: Date.now() };
+
+            return enrichFromRegData(f, json);
+
+        } catch (e) {
+            console.warn('Secondary reg call failed:', e.message);
+            return { source: 'fetch-error' };
+        }
+    }
+
+    // ─── Parse the /flights/reg/{reg} response to extract the next leg ───
+    // AeroDataBox returns an array of flights for this aircraft.
+    // We find the flight AFTER the current arrival (by time), pick its departure times.
+    function enrichFromRegData(f, json) {
+        // The endpoint can return an array or an object with .arrivals / .departures
+        // For /flights/reg/{reg} it returns an array directly
+        const flights = Array.isArray(json) ? json : (json.flights || json.arrivals || []);
+
+        if (!flights.length) return { source: 'no-flights' };
+
+        // Current flight's arrival basis time to find "after this"
+        const currentArrivalTime = parseTS(arrivalBasisTime(f));
+
+        // Sort all flights by their departure scheduled time ascending
+        const sorted = flights.slice().sort((a, b) => {
+            const ta = parseTS(extractTime(a.departure?.scheduledTime)) || new Date(0);
+            const tb = parseTS(extractTime(b.departure?.scheduledTime)) || new Date(0);
+            return ta - tb;
+        });
+
+        // Find the NEXT flight: departure time is after (or at) our arrival time
+        // Must not be the same flight number as this one
+        const currentFlightNum = (f.flight || '').replace(/\s+/g,'').toUpperCase();
+
+        let nextFlight = null;
+        for (const flight of sorted) {
+            const fNum = (flight.number || flight.iataNumber || '').replace(/\s+/g,'').toUpperCase();
+            const depScheduled = parseTS(extractTime(flight.departure?.scheduledTime));
+
+            // Skip if it's the same flight
+            if (fNum && fNum === currentFlightNum) continue;
+
+            // Must depart after the current arrival (allow 30min buffer for matching same arrival slot)
+            if (currentArrivalTime && depScheduled) {
+                if (depScheduled.getTime() < currentArrivalTime.getTime() - 30 * 60000) continue;
+            }
+
+            nextFlight = flight;
+            break;
+        }
+
+        if (!nextFlight) return { source: 'no-next-found' };
+
+        const dep = nextFlight.departure || {};
+        const arr = nextFlight.arrival || {};
+
+        const nextScheduledDep  = extractTime(dep.scheduledTime)  || null;
+        const nextRevisedDep    = extractTime(dep.revisedTime)     || extractTime(dep.actualTime) || null;
+        const nextPredictedDep  = extractTime(dep.predictedTime)   || null;
+        const nextRunwayDep     = extractTime(dep.runwayTime)       || null;
+
+        const nextFlightNum     = nextFlight.number || nextFlight.iataNumber || DISPLAY_DASH;
+        const nextDestIata      = airportCode(arr.airport);
+        const nextDestName      = airportName(arr.airport);
+        const nextGate          = dep.gate || DISPLAY_DASH;
+        const nextTerminal      = dep.terminal || DISPLAY_DASH;
+        const nextAirline       = nextFlight.airline?.name || DISPLAY_DASH;
+
+        // Determine if we got any real time
+        const hasRealTime = !!(nextScheduledDep || nextRevisedDep || nextPredictedDep || nextRunwayDep);
+
+        return {
+            source: hasRealTime ? 'api-real' : 'api-no-times',
+            nextScheduledDep,
+            nextRevisedDep,
+            nextPredictedDep,
+            nextRunwayDep,
+            nextFlightNum,
+            nextDestIata,
+            nextDestName,
+            nextGate,
+            nextTerminal,
+            nextAirline,
+            rawNextFlight: nextFlight,
+        };
+    }
+
+    // ─── Apply enrichment result back onto a flight object ───
+    function applyEnrichment(f, result) {
+        if (result.source !== 'api-real') return;
+        f._nextLegFlight      = result.nextFlightNum;
+        f._nextLegDest        = result.nextDestIata;
+        f._nextLegDestName    = result.nextDestName;
+        f._nextLegGate        = result.nextGate;
+        f._nextLegTerminal    = result.nextTerminal;
+        f._nextLegAirline     = result.nextAirline;
+        f._nextScheduledDep   = result.nextScheduledDep;
+        f._nextRevisedDep     = result.nextRevisedDep;
+        f._nextPredictedDep   = result.nextPredictedDep;
+        f._nextRunwayDep      = result.nextRunwayDep;
+        f._nextLegDataSource  = 'api'; // flag for UI rendering
+    }
+
+    // ─── TIMELINE BUILDER ───
+    function buildTimelineSteps(f, gm, delay) {
+        const hasLanding          = !!parseTS(f._landedAt);
+        const hasDeparture        = !!parseTS(f._departedAt);
+        const hasLinkedNextLeg    = !!(f._nextLegFlight || nextLegTime(f));
+        const isNextLegReal       = f._nextLegDataSource === 'api';
+        const projectedLanding    = projectedLandingTime(f);
+        const projectedGateIn     = projectedGateInTime(f);
+        const projectedNextOut    = projectedNextOutTime(f);
+        const projectedDeparture  = projectedDepartureTime(f);
+        const projectedBoarding   = projectedBoardingTime(f);
+
+        if (f._direction === 'departure') {
+            return [
+                {
+                    label: 'Scheduled Out',
+                    time: buildTimeSummary([
+                        ['Scheduled', f._scheduledDep],
+                        ['Estimated', f._revisedDep],
+                        ['Predicted', f._predictedDep],
+                    ], 'Pending'),
+                    note: f.dest !== DISPLAY_DASH ? 'To ' + f.dest : 'Destination not available',
+                    done: !!parseTS(f._scheduledDep),
+                    active: false,
+                    isReal: !!(f._scheduledDep || f._revisedDep),
+                },
+                {
+                    label: 'At Gate',
+                    time: [
+                        f.gate !== DISPLAY_DASH ? 'Gate ' + f.gate : 'Gate pending',
+                        f.terminal !== DISPLAY_DASH ? 'Terminal ' + f.terminal : '',
+                    ].filter(Boolean).join('\n'),
+                    note: buildTimeSummary([
+                        ['Projected boarding', projectedBoarding],
+                        ['Boarding target', f._revisedDep],
+                        ['Predicted', f._predictedDep],
+                    ], 'Awaiting gate-side estimate'),
+                    done: hasDeparture,
+                    active: !hasDeparture && f._status === 'on-ground',
+                    isReal: !!(f.gate && f.gate !== DISPLAY_DASH),
+                },
+                {
+                    label: 'Departed',
+                    time: buildTimeSummary([
+                        ['Runway', f._runwayDep],
+                        ['Gate out', f._departedAt],
+                        ['Estimated', f._revisedDep],
+                        ['Projected', projectedDeparture],
+                    ], 'Pending'),
+                    note: hasDeparture ? (delay > 0 ? '+' + delay + ' min delay' : 'On schedule') : 'Awaiting departure',
+                    done: hasDeparture,
+                    active: false,
+                    isReal: hasDeparture,
+                },
+            ];
+        }
+
+        // ── ARRIVAL direction ──
+        // Build next leg time summary — prefer real API data, fall back to projected
+        const realNextLegSummary = isNextLegReal
+            ? buildTimeSummary([
+                ['Scheduled', f._nextScheduledDep],
+                ['Estimated', f._nextRevisedDep],
+                ['Predicted', f._nextPredictedDep],
+                ['Runway', f._nextRunwayDep],
+              ], null)
+            : null;
+
+        const nextLegTimeSummary = realNextLegSummary
+            || buildTimeSummary([
+                ['Scheduled', f._nextScheduledDep],
+                ['Estimated', f._nextRevisedDep],
+                ['Predicted', f._nextPredictedDep],
+                ['Runway', f._nextRunwayDep],
+                ['Projected', projectedNextOut],
+               ], 'Not linked');
+
+        // Next leg note
+        let nextLegNote;
+        if (isNextLegReal) {
+            const parts = [f._nextLegFlight || 'Next flight'];
+            if (f._nextLegDest && f._nextLegDest !== DISPLAY_DASH) parts.push('→ ' + f._nextLegDest);
+            if (f._nextLegDestName && f._nextLegDestName !== DISPLAY_DASH) parts.push('(' + f._nextLegDestName + ')');
+            if (f._nextLegGate && f._nextLegGate !== DISPLAY_DASH) parts.push('Gate ' + f._nextLegGate);
+            if (f._nextLegAirline && f._nextLegAirline !== DISPLAY_DASH) parts.push(f._nextLegAirline);
+            nextLegNote = parts.join('\n');
+        } else if (hasLinkedNextLeg) {
+            nextLegNote = `${f._nextLegFlight || 'Next flight'}${f._nextLegDest && f._nextLegDest !== DISPLAY_DASH ? ' → ' + f._nextLegDest : ''}\n(matched from departures board)`;
+        } else {
+            nextLegNote = 'Projected only — outbound leg not yet fetched or not found.';
+        }
+
+        return [
+            {
+                label: 'Inbound',
+                time: buildTimeSummary([
+                    ['Scheduled', f._scheduledArr],
+                    ['Estimated', f._revisedArr],
+                    ['Predicted', f._predictedArr],
+                    ['Projected', projectedLanding],
+                ], 'Inbound'),
+                note: f.origin !== DISPLAY_DASH ? 'From ' + f.origin : 'Origin not available',
+                done: hasLanding,
+                active: f._status === 'approaching',
+                isReal: !!(f._scheduledArr || f._revisedArr || f._predictedArr),
+            },
+            {
+                label: 'Landed',
+                time: buildTimeSummary([
+                    ['Runway', f._runwayArr],
+                    ['Gate in', f._revisedArr],
+                    ['Actual', f._landedAt],
+                    ['Projected', projectedGateIn],
+                ], 'Pending'),
+                note: f.airport + (f.gate !== DISPLAY_DASH ? '\nGate ' + f.gate : ''),
+                done: hasLanding,
+                active: f._status === 'landed',
+                isReal: !!(f._runwayArr || f._landedAt),
+            },
+            {
+                label: 'On Ground',
+                time: buildTimeSummary([
+                    ['Arrive', firstValidTime(f._runwayArr, f._landedAt, f._revisedArr, projectedGateIn)],
+                    ['Next out', firstValidTime(f._nextRevisedDep, f._nextPredictedDep, f._nextScheduledDep, projectedNextOut)],
+                ], hasLanding ? (fmt(f._landedAt) + ' → now') : 'Pending'),
+                note: gm !== null
+                    ? gm + ' min since landing'
+                    : (isNextLegReal ? 'Turnaround linked from aircraft rotation.' : 'Projected turnaround based on current arrival time.'),
+                done: hasLinkedNextLeg && !!nextLegTime(f),
+                active: f._status === 'on-ground',
+                isReal: isNextLegReal || gm !== null,
+            },
+            {
+                label: 'Next Leg',
+                time: nextLegTimeSummary,
+                note: nextLegNote,
+                done: !!nextLegTime(f),
+                active: false,
+                isReal: isNextLegReal,
+            },
+        ];
+    }
+
+    // ─── CARDS ───
+    function renderCards() {
+        const grid = document.getElementById('cardsGrid');
+        const q = document.getElementById('searchIn').value.toLowerCase();
+        let data = allFlights.filter(f => {
+            if (activeFilter !== 'all' && f._status !== activeFilter) return false;
+            if (q) return (f.flight||'').toLowerCase().includes(q) || (f.airline||'').toLowerCase().includes(q) || (f.reg||'').toLowerCase().includes(q);
+            return true;
+        });
+        document.getElementById('countBadge').textContent = data.length + ' flight' + (data.length !== 1 ? 's' : '');
+        if (!data.length) {
+            grid.innerHTML = `<div class="empty-state"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg><p>No flights match your filter.</p></div>`;
+            return;
+        }
+        grid.innerHTML = data.map(f => {
+            const gm = (f._status==='on-ground'||f._status==='landed') ? groundMins(f) : null;
+            const pct = gm !== null ? Math.min(Math.round(gm/120*100),100) : 0;
+            const tColor = gm !== null ? timerColor(gm) : '#374151';
+            const sel = selectedId === f._id ? 'selected' : '';
+            return `<div class="fcard ${sel}" onclick="selectFlight('${f._id}')">
+  <div class="fcard-head">
+    <div><div class="fcard-flight">${safeText(f.flight)}</div><div class="fcard-airline">${safeText(f.airline)}</div></div>
+    <span class="status-pill ${statusClass(f._status)}">${statusLabel(f._status)}</span>
+  </div>
+  <div class="fcard-rows">
+    <div class="fcard-row"><span class="fcard-lbl">Reg.</span><span class="fcard-val">${safeText(f.reg)}</span></div>
+    <div class="fcard-row"><span class="fcard-lbl">Airport</span><span class="fcard-val">${safeText(f.airport)}</span></div>
+    <div class="fcard-row"><span class="fcard-lbl">Gate</span><span class="fcard-val">${safeText(f.gate)}</span></div>
+    <div class="fcard-row"><span class="fcard-lbl">${cardEventLabel(f)}</span><span class="fcard-val">${cardEventTime(f)}</span></div>
+  </div>
+  ${gm !== null
+    ? `<div class="ground-timer"><span class="timer-label" style="color:${tColor};">${gm}m</span><div class="timer-track"><div class="timer-fill" style="width:${pct}%;background:${tColor};"></div></div><span class="timer-note">on ground</span></div>`
+    : `<div class="ground-timer"><span style="font-size:11px;font-family:var(--mono);color:var(--muted);">${cardFooterText(f)}</span></div>`
+  }
+</div>`;
+        }).join('');
+    }
+
+    // ─── SELECT FLIGHT — now triggers secondary reg call ───
+    async function selectFlight(id) {
+        selectedId = id;
+        renderCards();
+        const f = allFlights.find(x => x._id === id);
+        if (!f) return;
+
+        const apiKey = document.getElementById('apiKey').value.trim();
+
+        // Only do secondary call for arrivals (need next leg), not departures
+        // and only when not in demo mode
+        if (f._direction === 'arrival' && apiKey && f.reg && f.reg !== DISPLAY_DASH) {
+            // Render immediately with loading state in audit panel
+            renderAudit(f, true /* loading */);
+
+            // Fire secondary call
+            const result = await fetchNextLegByReg(f);
+
+            // Apply enrichment to flight object if real data found
+            applyEnrichment(f, result);
+
+            // Re-render audit panel with enriched data
+            renderAudit(f, false, result);
+        } else {
+            renderAudit(f, false);
+        }
+    }
+
+    // ─── AUDIT PANEL RENDER ───
+    function renderAudit(f, loading = false, regResult = null) {
+        const gm = groundMins(f);
+        const delay = f._direction === 'arrival' ? (f._arrDelay || 0) : (f._depDelay || 0);
+        const delayLabel = f._direction === 'arrival' ? 'Arrival delay' : 'Departure delay';
+        const scheduledLabel = f._direction === 'arrival' ? 'Sched. arrival' : 'Sched. departure';
+        const revisedLabel = f._direction === 'arrival' ? 'Estimated arrival' : 'Estimated departure';
+        const predictedLabel = f._direction === 'arrival' ? 'Predicted arrival' : 'Predicted departure';
+        const runwayLabel = f._direction === 'arrival' ? 'Runway arrival' : 'Runway departure';
+        const projectedLabel = f._direction === 'arrival' ? 'Projected next out' : 'Projected departure';
+        const steps = buildTimelineSteps(f, gm, delay);
+        const projectedValue = f._direction === 'arrival' ? projectedNextOutTime(f) : projectedDepartureTime(f);
+        const isNextLegReal = f._nextLegDataSource === 'api';
+
+        // Data source banner
+        let bannerHtml = '';
+        if (f._direction === 'arrival') {
+            if (loading) {
+                bannerHtml = `<div class="data-source-banner dsb-projected"><span class="tl-spinner" style="display:inline-block;"></span>&nbsp;Fetching real next-leg data from aircraft registration…</div>`;
+            } else if (isNextLegReal) {
+                bannerHtml = `<div class="data-source-banner dsb-real"><span class="dsb-icon">✓</span> Next Leg times are real API data from aircraft registration <strong>${safeText(f.reg)}</strong></div>`;
+            } else if (!document.getElementById('apiKey').value.trim()) {
+                bannerHtml = `<div class="data-source-banner dsb-projected"><span class="dsb-icon">⚠</span> Demo mode — Next Leg times are projected estimates only</div>`;
+            } else if (f.reg && f.reg !== DISPLAY_DASH) {
+                const reason = regResult ? regResult.source : 'unknown';
+                const reasonText = {
+                    'no-next-found': 'No outbound flight found for this aircraft today.',
+                    'api-error': 'Registration lookup returned an error.',
+                    'empty': 'No data returned for this registration.',
+                    'no-flights': 'No flights listed for this registration.',
+                    'no-reg': 'No registration available for this flight.',
+                    'api-no-times': 'Next flight found but no times available yet.',
+                }[reason] || 'Could not fetch real next-leg data.';
+                bannerHtml = `<div class="data-source-banner dsb-projected"><span class="dsb-icon">⚠</span> Next Leg projected — ${reasonText}</div>`;
+            } else {
+                bannerHtml = `<div class="data-source-banner dsb-projected"><span class="dsb-icon">⚠</span> No registration — cannot fetch real next-leg data. Next Leg is projected.</div>`;
+            }
+        }
+
+        document.getElementById('auditEmpty').style.display = 'none';
+        const content = document.getElementById('auditContent');
+        content.style.display = 'block';
+        content.innerHTML = `<div class="audit-content">
+<div class="audit-header-sec">
+  <div class="plane-avatar"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg></div>
+  <div><div class="audit-flight-name">${safeText(f.flight)}</div><div class="audit-flight-sub">${safeText(f.airline)} · ${safeText(f.aircraftType)}</div></div>
+  <button class="close-btn" onclick="closeAudit()">close ×</button>
+</div>
+
+${bannerHtml}
+
+<div class="metrics-grid">
+  <div class="mcard"><div class="mcard-lbl">Ground time</div><div class="mcard-val" style="color:${gm !== null ? timerColor(gm) : 'var(--muted)'}">${gm !== null ? gm : '—'}<span class="mcard-unit">${gm !== null ? 'min' : ''}</span></div></div>
+  <div class="mcard"><div class="mcard-lbl">${delayLabel}</div><div class="mcard-val" style="color:${delay > 15 ? '#ef4444' : '#22c55e'}">${delay > 0 ? '+' + delay : '0'}<span class="mcard-unit">min</span></div></div>
+  <div class="mcard"><div class="mcard-lbl">Landed</div><div class="mcard-val" style="font-size:18px;">${fmt(f._landedAt)}</div></div>
+  <div class="mcard"><div class="mcard-lbl">Departed</div><div class="mcard-val" style="font-size:18px;">${fmt(f._departedAt)}</div></div>
+</div>
+
+<div><div class="tl-section-title">Ground event timeline</div>
+<div class="timeline">
+${steps.map(s => `
+<div class="tl-step">
+  <div class="tl-node ${s.done ? 'done' : s.active ? 'active' : ''}"><div class="tl-node-inner"></div></div>
+  <div class="tl-connector"></div>
+  <div class="tl-step-head">
+    <span class="tl-step-label" style="color:${s.active ? '#f59e0b' : s.done ? '#f0f2f7' : '#6b7280'}">${safeText(s.label)}</span>
+    ${s.active ? '<span class="tl-live-tag">live</span>' : ''}
+    ${s.isReal && !s.active ? '<span class="tl-real-tag">real</span>' : ''}
+    ${loading && s.label === 'Next Leg' ? '<div class="tl-loading"><div class="tl-spinner"></div><span class="tl-loading-text">fetching…</span></div>' : ''}
+  </div>
+  <div class="tl-step-time">${safeText(s.time)}</div>
+  <div class="tl-step-note">${safeText(s.note)}</div>
+</div>`).join('')}
+</div></div>
+
+<div><div class="tl-section-title">Aircraft &amp; route details</div>
+<table class="details-table">
+  <tr><td class="dl">Flight</td><td class="dv">${safeText(f.flight)}</td></tr>
+  <tr><td class="dl">Airline</td><td class="dv">${safeText(f.airline)}</td></tr>
+  <tr><td class="dl">Direction</td><td class="dv">${safeText(f._direction)}</td></tr>
+  <tr><td class="dl">IATA / ICAO</td><td class="dv">${safeText(f.iata)} / ${safeText(f.icao)}</td></tr>
+  <tr><td class="dl">Registration</td><td class="dv" style="color:${f.reg===DISPLAY_DASH?'var(--muted)':'var(--text)'}">${safeText(f.reg)}</td></tr>
+  <tr><td class="dl">Mode-S / Ship</td><td class="dv" style="color:${f.shipNo===DISPLAY_DASH?'var(--muted)':'var(--text)'}">${safeText(f.shipNo)}</td></tr>
+  <tr><td class="dl">Aircraft type</td><td class="dv">${safeText(f.aircraftType)}</td></tr>
+  <tr><td class="dl">Airport</td><td class="dv">${safeText(f.airport)}</td></tr>
+  <tr><td class="dl">Gate</td><td class="dv" style="color:${f.gate===DISPLAY_DASH?'var(--muted)':'var(--text)'}">${safeText(f.gate)}</td></tr>
+  <tr><td class="dl">Terminal</td><td class="dv">${safeText(f.terminal)}</td></tr>
+  <tr><td class="dl">Baggage belt</td><td class="dv">${safeText(f.baggageBelt||DISPLAY_DASH)}</td></tr>
+  <tr><td class="dl">Origin</td><td class="dv">${safeText(f.origin)}${f.originName&&f.originName!==DISPLAY_DASH?' · '+safeText(f.originName,''):''}</td></tr>
+  <tr><td class="dl">Destination</td><td class="dv">${safeText(f.dest)}${f.destName&&f.destName!==DISPLAY_DASH?' · '+safeText(f.destName,''):''}</td></tr>
+  <tr><td class="dl">${scheduledLabel}</td><td class="dv">${fmt(f._direction==='arrival'?f._scheduledArr:f._scheduledDep)}</td></tr>
+  <tr><td class="dl">${revisedLabel}</td><td class="dv">${fmt(f._direction==='arrival'?f._revisedArr:f._revisedDep)}</td></tr>
+  <tr><td class="dl">${predictedLabel}</td><td class="dv">${fmt(f._direction==='arrival'?f._predictedArr:f._predictedDep)}</td></tr>
+  <tr><td class="dl">${runwayLabel}</td><td class="dv">${fmt(f._direction==='arrival'?f._runwayArr:f._runwayDep)}</td></tr>
+  <tr><td class="dl">${projectedLabel}</td><td class="dv">${fmt(projectedValue)}</td></tr>
+  <tr><td class="dl">Next leg flight</td><td class="dv" style="color:${isNextLegReal?'var(--green)':'var(--muted)'}">${safeText(f._nextLegFlight||DISPLAY_DASH)}${f._nextLegDest&&f._nextLegDest!==DISPLAY_DASH?' → '+safeText(f._nextLegDest,''):''} ${isNextLegReal?'<span style="font-size:10px;color:var(--green)">(API)</span>':'(projected)'}</td></tr>
+  <tr><td class="dl">Next leg sched.</td><td class="dv" style="color:${isNextLegReal?'var(--text)':'var(--muted)'}">${fmt(f._nextScheduledDep)}</td></tr>
+  <tr><td class="dl">Next leg est.</td><td class="dv" style="color:${isNextLegReal?'var(--text)':'var(--muted)'}">${fmt(f._nextRevisedDep)}</td></tr>
+  <tr><td class="dl">Next leg gate</td><td class="dv" style="color:${isNextLegReal&&f._nextLegGate&&f._nextLegGate!==DISPLAY_DASH?'var(--text)':'var(--muted)'}">${safeText(f._nextLegGate||DISPLAY_DASH)}</td></tr>
+  <tr><td class="dl">Arr. delay</td><td class="dv" style="color:${(f._arrDelay||0)>15?'var(--red)':'var(--green)'}">${f._arrDelay||0} min</td></tr>
+  <tr><td class="dl">Dep. delay</td><td class="dv" style="color:${(f._depDelay||0)>15?'var(--red)':'var(--green)'}">${f._depDelay||0} min</td></tr>
+  <tr><td class="dl">Reg. data source</td><td class="dv" style="color:${isNextLegReal?'var(--green)':'var(--muted)'}">${isNextLegReal?'✓ Secondary API call (real)':'Projected / not fetched'}</td></tr>
+</table></div>
+
+<div>
+  <div class="tl-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+    Raw API data
+    <button onclick="toggleRaw('${f._id}')" style="font-size:10px;font-family:var(--mono);background:transparent;border:1px solid var(--border2);border-radius:4px;color:var(--muted);padding:2px 8px;cursor:pointer;">show / hide</button>
+  </div>
+  <pre id="raw-${f._id}" style="display:none;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:10px;font-family:var(--mono);font-size:10px;color:var(--muted);overflow-x:auto;white-space:pre-wrap;word-break:break-all;max-height:300px;overflow-y:auto;">${safeText(JSON.stringify(rawFlightMap[f._id]||{},null,2),'{}')}</pre>
+</div>
+
+</div>`;
+    }
+
+    function closeAudit() {
+        selectedId = null;
+        document.getElementById('auditEmpty').style.display = 'flex';
+        document.getElementById('auditContent').style.display = 'none';
+        renderCards();
+    }
+
+    function toggleRaw(id) {
+        const el = document.getElementById('raw-' + id);
+        if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+
+    // ─── PARSE HELPERS ───
+    function extractTime(obj) {
+        if (!obj) return null;
+        if (typeof obj === 'string') return obj;
+        if (obj.local) return obj.local;
+        if (obj.utc) return obj.utc;
+        return null;
+    }
+
+    let rawFlightMap = {};
+
+    function parseFlights(raw) {
+        rawFlightMap = {};
+        const list = [];
+        const process = (arr, dir) => {
+            (arr || []).forEach((f, i) => {
+                const dep = f.departure || {};
+                const arr2 = f.arrival || {};
+                const isArr = dir === 'arr';
+
+                const arrivalScheduled  = extractTime(arr2.scheduledTime) || null;
+                const arrivalRevised    = extractTime(arr2.revisedTime) || extractTime(arr2.actualTime) || null;
+                const arrivalPredicted  = extractTime(arr2.predictedTime) || null;
+                const arrivalRunway     = extractTime(arr2.runwayTime) || null;
+                const departureScheduled= extractTime(dep.scheduledTime) || null;
+                const departureRevised  = extractTime(dep.revisedTime) || extractTime(dep.actualTime) || null;
+                const departurePredicted= extractTime(dep.predictedTime) || null;
+                const departureRunway   = extractTime(dep.runwayTime) || null;
+
+                const landedAt   = isArr ? (arrivalRunway || extractTime(arr2.actualTime) || null) : null;
+                const departedAt = isArr ? null : (departureRunway || extractTime(dep.actualTime) || null);
+
+                const sRaw = (f.status || f.movement?.status || '').toLowerCase();
+
+                const safeLandedAt      = parseTS(landedAt)           ? landedAt            : null;
+                const safeDepartedAt    = parseTS(departedAt)         ? departedAt          : null;
+                const safeScheduledArr  = parseTS(arrivalScheduled)   ? arrivalScheduled    : null;
+                const safeScheduledDep  = parseTS(departureScheduled) ? departureScheduled  : null;
+                const safeRevisedArr    = parseTS(arrivalRevised)     ? arrivalRevised      : null;
+                const safePredictedArr  = parseTS(arrivalPredicted)   ? arrivalPredicted    : null;
+                const safeRunwayArr     = parseTS(arrivalRunway)      ? arrivalRunway       : null;
+                const safeRevisedDep    = parseTS(departureRevised)   ? departureRevised    : null;
+                const safePredictedDep  = parseTS(departurePredicted) ? departurePredicted  : null;
+                const safeRunwayDep     = parseTS(departureRunway)    ? departureRunway     : null;
+
+                let status = 'approaching';
+                if (isArr) {
+                    if (sRaw.includes('ground')||sRaw.includes('boarding')||sRaw.includes('taxi')) status = 'on-ground';
+                    else if (sRaw.includes('land')||sRaw.includes('arrived')||safeLandedAt) status = 'landed';
+                    else status = 'approaching';
+                } else if (sRaw.includes('depart')||sRaw.includes('airborne')||sRaw.includes('en-route')||safeDepartedAt) {
+                    status = 'departed';
+                } else {
+                    status = 'on-ground';
+                }
+
+                const ac = f.aircraft || {};
+                const reg       = ac.reg || ac.registration || ac.tail || '—';
+                const shipNo    = ac.modeS || ac.serialNo || ac.icao24 || '—';
+                const acType    = ac.model || ac.type || ac.icaoCode || ac.iataCodeLong || '—';
+                const thisApt   = isArr ? arr2 : dep;
+                const airportIata = airportCode(thisApt.airport);
+                const gate      = thisApt.gate || DISPLAY_DASH;
+                const terminal  = thisApt.terminal || DISPLAY_DASH;
+                const baggageBelt = arr2.baggageBelt || DISPLAY_DASH;
+                const originIata  = airportCode(dep.airport);
+                const destIata    = airportCode(arr2.airport);
+                const originName  = airportName(dep.airport);
+                const destName    = airportName(arr2.airport);
+
+                const id = buildFlightId([
+                    dir,
+                    f.number || f.iataNumber || 'FL',
+                    ac.reg || ac.registration || ac.tail || 'aircraft',
+                    safeScheduledArr || safeScheduledDep || safeLandedAt || safeDepartedAt || i,
+                ]);
+
+                rawFlightMap[id] = f;
+
+                list.push({
+                    _id: id,
+                    _direction: isArr ? 'arrival' : 'departure',
+                    _status: status,
+                    _landedAt: safeLandedAt,
+                    _departedAt: safeDepartedAt,
+                    _scheduledArr: safeScheduledArr,
+                    _scheduledDep: safeScheduledDep,
+                    _revisedArr: safeRevisedArr,
+                    _predictedArr: safePredictedArr,
+                    _runwayArr: safeRunwayArr,
+                    _revisedDep: safeRevisedDep,
+                    _predictedDep: safePredictedDep,
+                    _runwayDep: safeRunwayDep,
+                    // Next leg — initially null, filled by secondary call
+                    _nextLegFlight: null,
+                    _nextLegDest: null,
+                    _nextLegDestName: null,
+                    _nextLegGate: null,
+                    _nextLegTerminal: null,
+                    _nextLegAirline: null,
+                    _nextScheduledDep: null,
+                    _nextRevisedDep: null,
+                    _nextPredictedDep: null,
+                    _nextRunwayDep: null,
+                    _nextLegDataSource: null, // 'api' | null
+                    _depDelay: normalizeDelay(dep.delay || dep.delayTime),
+                    _arrDelay: normalizeDelay(arr2.delay || arr2.delayTime),
+                    flight: f.number || f.iataNumber || DISPLAY_DASH,
+                    airline: f.airline?.name || DISPLAY_DASH,
+                    reg, shipNo, acType,
+                    aircraftType: acType,
+                    airport: airportIata,
+                    gate, terminal, baggageBelt,
+                    origin: originIata,
+                    dest: destIata,
+                    originName, destName,
+                    iata: f.airline?.iata || DISPLAY_DASH,
+                    icao: f.airline?.icao || DISPLAY_DASH,
+                });
+            });
+        };
+
+        if (Array.isArray(raw)) raw.forEach(f => process([f], 'dep'));
+        else { process(raw.arrivals||[], 'arr'); process(raw.departures||[], 'dep'); }
+
+        // Cross-match arrivals → departures within the same FIDS pull
+        // (existing logic — still useful as a quick fallback before secondary call)
+        const departures = list.filter(f => f._direction === 'departure');
+        const arrivals   = list.filter(f => f._direction === 'arrival');
+        arrivals.forEach(arrival => {
+            const arrivalTime = parseTS(arrivalBasisTime(arrival));
+            const match = departures
+                .filter(dep => {
+                    const sameReg  = arrival.reg  !== DISPLAY_DASH && dep.reg  === arrival.reg;
+                    const sameShip = arrival.shipNo !== DISPLAY_DASH && dep.shipNo === arrival.shipNo;
+                    return sameReg || sameShip;
+                })
+                .filter(dep => {
+                    const depTime = parseTS(departureBasisTime(dep));
+                    if (!arrivalTime || !depTime) return true;
+                    return depTime.getTime() >= arrivalTime.getTime() - 30*60000;
+                })
+                .sort((a, b) => {
+                    const at = parseTS(departureBasisTime(a));
+                    const bt = parseTS(departureBasisTime(b));
+                    return (at?at.getTime():Number.MAX_SAFE_INTEGER) - (bt?bt.getTime():Number.MAX_SAFE_INTEGER);
+                })[0];
+
+            if (!match) return;
+            // Only set from FIDS cross-match if not already set by API
+            if (!arrival._nextLegFlight) {
+                arrival._nextLegFlight    = match.flight;
+                arrival._nextLegDest      = match.dest;
+                arrival._nextScheduledDep = match._scheduledDep;
+                arrival._nextRevisedDep   = match._revisedDep;
+                arrival._nextPredictedDep = match._predictedDep;
+                arrival._nextRunwayDep    = match._runwayDep;
+                // Note: _nextLegDataSource stays null (not a real secondary call)
+            }
+        });
+
+        return list;
+    }
+
+    // ─── TIME WINDOW ───
+    function pad(n) { return String(n).padStart(2,'0'); }
+    function fmtDate(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+    function fmtTime(d) { return `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+    function fmtApiDateTime(d) { return `${fmtDate(d)}T${fmtTime(d)}`; }
+
+    function initDatePicker() { document.getElementById('dateIn').value = fmtDate(new Date()); setQuick('now'); }
+
+    function setQuick(preset) {
+        document.querySelectorAll('.qbtn').forEach(b => b.classList.remove('active'));
+        const btn = document.getElementById('q-'+preset); if (btn) btn.classList.add('active');
+        const now = new Date();
+        if (preset === 'now') {
+            const start = new Date(now.getTime()-3*60*60000);
+            const end   = new Date(now.getTime()+3*60*60000);
+            document.getElementById('dateIn').value   = fmtDate(start);
+            document.getElementById('timeFrom').value = fmtTime(start);
+            document.getElementById('timeTo').value   = fmtTime(end);
+        } else if (preset==='morning')   { document.getElementById('timeFrom').value='05:00'; document.getElementById('timeTo').value='12:00'; }
+        else if (preset==='afternoon')   { document.getElementById('timeFrom').value='12:00'; document.getElementById('timeTo').value='18:00'; }
+        else if (preset==='evening')     { document.getElementById('timeFrom').value='18:00'; document.getElementById('timeTo').value='23:59'; }
+        else if (preset==='allday')      { document.getElementById('timeFrom').value='00:00'; document.getElementById('timeTo').value='23:59'; }
+        updateWindowNote();
+    }
+
+    function updateWindowNote() {
+        const date = document.getElementById('dateIn').value;
+        const from = document.getElementById('timeFrom').value;
+        const to   = document.getElementById('timeTo').value;
+        if (!date||!from||!to) { document.getElementById('windowNote').textContent='—'; return; }
+        const start = new Date(date+'T'+from+':00');
+        const end   = new Date(date+'T'+to+':00');
+        if (end < start) end.setDate(end.getDate()+1);
+        const suffix = fmtDate(end) !== fmtDate(start) ? ' (+1d)' : '';
+        document.getElementById('windowNote').textContent =
+            start.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'})+'  '+from+' → '+to+suffix;
+    }
+
+    ['dateIn','timeFrom','timeTo'].forEach(id => {
+        document.getElementById(id)?.addEventListener('change', () => {
+            document.querySelectorAll('.qbtn').forEach(b => b.classList.remove('active'));
+            updateWindowNote();
+        });
+    });
+
+    function buildTimeWindow() {
+        const date = document.getElementById('dateIn').value || fmtDate(new Date());
+        const from = document.getElementById('timeFrom').value || '00:00';
+        const to   = document.getElementById('timeTo').value || '23:59';
+        const start = new Date(date+'T'+from+':00');
+        const end   = new Date(date+'T'+to+':00');
+        if (end < start) end.setDate(end.getDate()+1);
+        return { startStr: fmtApiDateTime(start), endStr: fmtApiDateTime(end) };
+    }
+
+    // ─── MAIN FETCH ───
+    async function fetchFlights() {
+        const icao   = resolveICAO();
+        const apiKey = document.getElementById('apiKey').value.trim();
+        const errEl  = document.getElementById('errMsg');
+
+        if (!apiKey) {
+            if (refreshInterval) { clearInterval(refreshInterval); refreshInterval = null; }
+            errEl.style.display = 'none'; errEl.textContent = '';
+            loadDemo(); return;
+        }
+        if (!icao) { errEl.textContent='Please enter a valid airport code (e.g. JFK or KJFK).'; errEl.style.display='block'; return; }
+
+        const bar = document.getElementById('loadingBar');
+        bar.classList.remove('done'); bar.classList.add('active');
+        errEl.style.display = 'none'; errEl.textContent = '';
+
+        const { startStr, endStr } = buildTimeWindow();
+        const url = `https://aerodatabox.p.rapidapi.com/flights/airports/icao/${encodeURIComponent(icao)}/${encodeURIComponent(startStr)}/${encodeURIComponent(endStr)}?withLeg=true&direction=Both&withCancelled=false&withCodeshared=true&withCargo=false&withPrivate=false`;
+
+        try {
+            const res = await fetch(url, {
+                headers: { 'x-rapidapi-host':'aerodatabox.p.rapidapi.com','x-rapidapi-key':apiKey }
+            });
+            const rawText = await res.text();
+
+            if (!res.ok) {
+                let detail = '';
+                try { detail = JSON.parse(rawText)?.message || rawText.slice(0,120); } catch { detail = rawText.slice(0,120); }
+                if (res.status===401||res.status===403) throw new Error('Invalid or expired API key (HTTP '+res.status+').');
+                if (res.status===404) throw new Error('Airport "'+icao+'" not found. Double-check the ICAO code.');
+                if (res.status===429) throw new Error('Rate limit hit. Wait a moment and try again.');
+                throw new Error('API error '+res.status+(detail?': '+detail:'.'));
+            }
+
+            if (!rawText||rawText.trim()==='') throw new Error('No flights found for '+icao+' in '+startStr+' → '+endStr+'. Try "All day" or a different date.');
+
+            let json;
+            try { json = JSON.parse(rawText); } catch { throw new Error('Could not parse API response: '+rawText.slice(0,80)); }
+
+            allFlights = parseFlights(json);
+
+            if (!allFlights.length) {
+                errEl.textContent='API returned 0 flights for '+icao+' in '+startStr+' → '+endStr+'. Try "All day" or a different date.';
+                errEl.style.display='block'; return;
+            }
+
+            renderCards();
+            document.getElementById('lastUpdate').textContent = 'Updated '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'})+' · '+icao;
+            document.getElementById('livePill').style.display = 'flex';
+
+            // If a flight is selected, re-render its audit (but don't re-fire secondary call if already enriched)
+            if (selectedId) {
+                const f = allFlights.find(x => x._id === selectedId);
+                if (f) renderAudit(f, false);
+                else closeAudit();
+            }
+        } catch(e) {
+            console.error('fetchFlights error:',e);
+            errEl.textContent = e.message; errEl.style.display = 'block';
+        } finally {
+            bar.classList.remove('active'); bar.classList.add('done');
+            setTimeout(() => bar.classList.remove('done'), 600);
+        }
+    }
+
+    function startLive() {
+        if (refreshInterval) clearInterval(refreshInterval);
+        if (demoInterval) { clearInterval(demoInterval); demoInterval = null; }
+        document.getElementById('stopBtn').style.display = 'block';
+        if (!document.getElementById('apiKey').value.trim()) { loadDemo(); return; }
+        fetchFlights();
+        refreshInterval = setInterval(fetchFlights, LIVE_REFRESH_MS);
+    }
+
+    function stopLive() {
+        if (refreshInterval) clearInterval(refreshInterval);
+        if (demoInterval) clearInterval(demoInterval);
+        refreshInterval = null; demoInterval = null;
+        document.getElementById('stopBtn').style.display = 'none';
+        document.getElementById('livePill').style.display = 'none';
+        document.getElementById('lastUpdate').textContent = 'Stopped';
+    }
+
+    // ─── DEMO ───
+    function loadDemo() {
+        if (demoInterval) clearInterval(demoInterval);
+        const now = new Date();
+        const ago = m => new Date(now - m*60000).toISOString();
+        const ahead = m => new Date(now.getTime()+m*60000).toISOString();
+        allFlights = [
+            { _id:'BG001',_direction:'arrival',_status:'on-ground',_landedAt:ago(47),_departedAt:null,_scheduledArr:ago(50),_scheduledDep:null,_depDelay:0,_arrDelay:0,flight:'BG001',airline:'Biman Bangladesh',reg:'S2-AHM',shipNo:'HM001',aircraftType:'Boeing 787-8',airport:'DAC',gate:'A3',terminal:'1',baggageBelt:'2',origin:'DXB',dest:'DAC',iata:'BG',icao:'BBC',_nextLegFlight:null,_nextLegDest:null,_nextLegGate:null,_nextLegAirline:null,_nextScheduledDep:null,_nextRevisedDep:null,_nextPredictedDep:null,_nextRunwayDep:null,_nextLegDataSource:null },
+            { _id:'BG007',_direction:'arrival',_status:'on-ground',_landedAt:ago(112),_departedAt:null,_scheduledArr:ago(100),_scheduledDep:null,_depDelay:0,_arrDelay:12,flight:'BG007',airline:'Biman Bangladesh',reg:'S2-AJN',shipNo:'JN007',aircraftType:'Boeing 737-800',airport:'DAC',gate:'B1',terminal:'1',baggageBelt:'4',origin:'CGP',dest:'DAC',iata:'BG',icao:'BBC',_nextLegFlight:null,_nextLegDest:null,_nextLegGate:null,_nextLegAirline:null,_nextScheduledDep:null,_nextRevisedDep:null,_nextPredictedDep:null,_nextRunwayDep:null,_nextLegDataSource:null },
+            { _id:'EK582',_direction:'arrival',_status:'landed',_landedAt:ago(8),_departedAt:null,_scheduledArr:ago(5),_scheduledDep:null,_revisedArr:ago(6),_predictedArr:ago(4),_runwayArr:ago(8),_depDelay:0,_arrDelay:0,flight:'EK582',airline:'Emirates',reg:'A6-EPO',shipNo:'EPO58',aircraftType:'Boeing 777-300ER',airport:'DAC',gate:'A1',terminal:'1',baggageBelt:'1',origin:'DXB',dest:'DAC',iata:'EK',icao:'UAE',_nextLegFlight:null,_nextLegDest:null,_nextLegGate:null,_nextLegAirline:null,_nextScheduledDep:null,_nextRevisedDep:null,_nextPredictedDep:null,_nextRunwayDep:null,_nextLegDataSource:null },
+            { _id:'QR648',_direction:'arrival',_status:'approaching',_landedAt:null,_departedAt:null,_scheduledArr:ahead(18),_scheduledDep:null,_revisedArr:ahead(24),_predictedArr:ahead(20),_runwayArr:ahead(22),_depDelay:0,_arrDelay:0,flight:'QR648',airline:'Qatar Airways',reg:'A7-BEG',shipNo:'BEG64',aircraftType:'Boeing 787-9',airport:'DAC',gate:'A2',terminal:'1',baggageBelt:DISPLAY_DASH,origin:'DOH',dest:'DAC',iata:'QR',icao:'QTR',_nextLegFlight:'QR649',_nextLegDest:'DOH',_nextLegGate:'A2',_nextLegAirline:'Qatar Airways',_nextScheduledDep:ahead(120),_nextRevisedDep:ahead(132),_nextPredictedDep:ahead(126),_nextRunwayDep:null,_nextLegDataSource:'api' },
+            { _id:'SQ445',_direction:'departure',_status:'departed',_landedAt:ago(95),_departedAt:ago(12),_scheduledArr:null,_scheduledDep:ago(17),_revisedDep:ago(14),_predictedDep:ago(16),_runwayDep:ago(12),_depDelay:5,_arrDelay:0,flight:'SQ445',airline:'Singapore Airlines',reg:'9V-SKB',shipNo:'SKB44',aircraftType:'Airbus A350-900',airport:'DAC',gate:'B3',terminal:'1',baggageBelt:DISPLAY_DASH,origin:'DAC',dest:'SIN',iata:'SQ',icao:'SIA',_nextLegFlight:null,_nextLegDest:null,_nextLegGate:null,_nextLegAirline:null,_nextScheduledDep:null,_nextRevisedDep:null,_nextPredictedDep:null,_nextRunwayDep:null,_nextLegDataSource:null },
+            { _id:'TG323',_direction:'arrival',_status:'on-ground',_landedAt:ago(63),_departedAt:null,_scheduledArr:ago(60),_scheduledDep:null,_depDelay:0,_arrDelay:0,flight:'TG323',airline:'Thai Airways',reg:'HS-TGW',shipNo:'TGW32',aircraftType:'Boeing 777-300ER',airport:'DAC',gate:'D4',terminal:'1',baggageBelt:'6',origin:'BKK',dest:'DAC',iata:'TG',icao:'THA',_nextLegFlight:null,_nextLegDest:null,_nextLegGate:null,_nextLegAirline:null,_nextScheduledDep:null,_nextRevisedDep:null,_nextPredictedDep:null,_nextRunwayDep:null,_nextLegDataSource:null },
+            { _id:'BS101',_direction:'departure',_status:'departed',_landedAt:ago(75),_departedAt:ago(20),_scheduledArr:null,_scheduledDep:ago(20),_revisedDep:ago(20),_predictedDep:ago(18),_runwayDep:ago(20),_depDelay:0,_arrDelay:0,flight:'BS101',airline:'US-Bangla',reg:'S2-AJV',shipNo:'JV101',aircraftType:'ATR 72-600',airport:'DAC',gate:'C2',terminal:'2',baggageBelt:DISPLAY_DASH,origin:'DAC',dest:'CGP',iata:'BS',icao:'UBG',_nextLegFlight:null,_nextLegDest:null,_nextLegGate:null,_nextLegAirline:null,_nextScheduledDep:null,_nextRevisedDep:null,_nextPredictedDep:null,_nextRunwayDep:null,_nextLegDataSource:null },
+            { _id:'MH192',_direction:'arrival',_status:'approaching',_landedAt:null,_departedAt:null,_scheduledArr:ahead(35),_scheduledDep:null,_revisedArr:ahead(42),_predictedArr:ahead(38),_runwayArr:ahead(39),_depDelay:0,_arrDelay:0,flight:'MH192',airline:'Malaysia Airlines',reg:'9M-MXE',shipNo:'MXE19',aircraftType:'Airbus A330-300',airport:DISPLAY_DASH,gate:DISPLAY_DASH,terminal:'1',baggageBelt:DISPLAY_DASH,origin:'KUL',dest:'DAC',iata:'MH',icao:'MAS',_nextLegFlight:null,_nextLegDest:null,_nextLegGate:null,_nextLegAirline:null,_nextScheduledDep:null,_nextRevisedDep:null,_nextPredictedDep:null,_nextRunwayDep:null,_nextLegDataSource:null },
+        ];
+        renderCards();
+        document.getElementById('lastUpdate').textContent = 'Demo mode · '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+        document.getElementById('livePill').style.display = 'flex';
+        demoInterval = setInterval(() => {
+            renderCards();
+            if (selectedId) {
+                const f = allFlights.find(x => x._id === selectedId);
+                if (f) renderAudit(f, false);
+                else closeAudit();
+            }
+            document.getElementById('lastUpdate').textContent = 'Demo mode · '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+        }, DEMO_REFRESH_MS);
+    }
+
+    initDatePicker();
+    loadDemo();
+    </script>
+</body>
+</html>

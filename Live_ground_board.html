@@ -842,6 +842,7 @@
             font-size: 12px;
             font-family: var(--mono);
             color: var(--muted);
+            white-space: pre-line;
         }
 
         .tl-step-note {
@@ -849,6 +850,7 @@
             color: var(--dim);
             font-family: var(--mono);
             margin-top: 2px;
+            white-space: pre-line;
         }
 
         .details-table {
@@ -1083,6 +1085,8 @@
         const DISPLAY_DASH = '—';
         const LIVE_REFRESH_MS = 30000;
         const DEMO_REFRESH_MS = 10000;
+        const PROJECTED_TAXI_TO_GATE_MIN = 8;
+        const PROJECTED_TURNAROUND_MIN = 75;
 
         let allFlights = [];
         let selectedId = null;
@@ -1159,6 +1163,82 @@
                 .filter(Boolean)
                 .join('-')
                 .replace(/[^a-zA-Z0-9_-]+/g, '-');
+        }
+
+        function hasTime(val) {
+            return !!parseTS(val);
+        }
+
+        function firstValidTime(...values) {
+            return values.find(hasTime) || null;
+        }
+
+        function timeKey(val) {
+            const d = parseTS(val);
+            return d ? d.toISOString() : '';
+        }
+
+        function buildTimeSummary(entries, fallback = DISPLAY_DASH) {
+            const seen = new Set();
+            const lines = [];
+
+            entries.forEach(([label, value]) => {
+                if (!hasTime(value)) return;
+                const key = timeKey(value);
+                if (!key || seen.has(key)) return;
+                seen.add(key);
+                lines.push(`${label}: ${fmt(value)}`);
+            });
+
+            return lines.length ? lines.join('\n') : fallback;
+        }
+
+        function addMinutes(val, minutes) {
+            const base = parseTS(val);
+            if (!base) return null;
+            return new Date(base.getTime() + minutes * 60000).toISOString();
+        }
+
+        function projectedLandingTime(f) {
+            return firstValidTime(f._runwayArr, f._revisedArr, f._predictedArr, f._scheduledArr, f._landedAt);
+        }
+
+        function projectedGateInTime(f) {
+            return firstValidTime(f._revisedArr, f._landedAt, addMinutes(projectedLandingTime(f), PROJECTED_TAXI_TO_GATE_MIN));
+        }
+
+        function projectedNextOutTime(f) {
+            return firstValidTime(
+                f._nextRevisedDep,
+                f._nextPredictedDep,
+                f._nextScheduledDep,
+                addMinutes(projectedGateInTime(f), PROJECTED_TURNAROUND_MIN),
+                addMinutes(projectedLandingTime(f), PROJECTED_TAXI_TO_GATE_MIN + PROJECTED_TURNAROUND_MIN),
+            );
+        }
+
+        function projectedDepartureTime(f) {
+            return firstValidTime(f._runwayDep, f._revisedDep, f._predictedDep, f._scheduledDep, f._departedAt);
+        }
+
+        function projectedBoardingTime(f) {
+            return firstValidTime(
+                addMinutes(projectedDepartureTime(f), -35),
+                addMinutes(f._scheduledDep, -35),
+                addMinutes(f._revisedDep, -35),
+            );
+        }
+
+        function nextLegTime(f) {
+            return firstValidTime(f._nextRunwayDep, f._nextRevisedDep, f._nextPredictedDep, f._nextScheduledDep);
+        }
+
+        function arrivalBasisTime(f) {
+            return firstValidTime(f._runwayArr, f._revisedArr, f._predictedArr, f._scheduledArr, f._landedAt);
+        }
+
+        function departureBasisTime(f) {
+            return firstValidTime(f._runwayDep, f._revisedDep, f._predictedDep, f._scheduledDep, f._departedAt);
         }
 
         // ─── FILTERS ───
@@ -1242,26 +1322,48 @@
         function buildTimelineSteps(f, gm, delay) {
             const hasLanding = !!parseTS(f._landedAt);
             const hasDeparture = !!parseTS(f._departedAt);
+            const hasLinkedNextLeg = !!(f._nextLegFlight || nextLegTime(f));
+            const projectedLanding = projectedLandingTime(f);
+            const projectedGateIn = projectedGateInTime(f);
+            const projectedNextOut = projectedNextOutTime(f);
+            const projectedDeparture = projectedDepartureTime(f);
+            const projectedBoarding = projectedBoardingTime(f);
 
             if (f._direction === 'departure') {
                 return [
                     {
                         label: 'Scheduled Out',
-                        time: fmt(f._scheduledDep, 'Pending'),
+                        time: buildTimeSummary([
+                            ['Scheduled', f._scheduledDep],
+                            ['Estimated', f._revisedDep],
+                            ['Predicted', f._predictedDep],
+                        ], 'Pending'),
                         note: f.dest !== DISPLAY_DASH ? 'To ' + f.dest : 'Destination not available',
                         done: !!parseTS(f._scheduledDep),
                         active: false,
                     },
                     {
                         label: 'At Gate',
-                        time: f.gate !== DISPLAY_DASH ? 'Gate ' + f.gate : 'Gate pending',
-                        note: f.terminal !== DISPLAY_DASH ? 'Terminal ' + f.terminal : 'Terminal pending',
+                        time: [
+                            f.gate !== DISPLAY_DASH ? 'Gate ' + f.gate : 'Gate pending',
+                            f.terminal !== DISPLAY_DASH ? 'Terminal ' + f.terminal : 'Terminal pending',
+                        ].join('\n'),
+                        note: buildTimeSummary([
+                            ['Projected boarding', projectedBoarding],
+                            ['Boarding target', f._revisedDep],
+                            ['Predicted', f._predictedDep],
+                        ], 'Awaiting gate-side estimate'),
                         done: hasDeparture,
                         active: !hasDeparture && f._status === 'on-ground',
                     },
                     {
                         label: 'Departed',
-                        time: fmt(f._departedAt, 'Pending'),
+                        time: buildTimeSummary([
+                            ['Runway', f._runwayDep],
+                            ['Gate out', f._departedAt],
+                            ['Estimated', f._revisedDep],
+                            ['Projected', projectedDeparture],
+                        ], 'Pending'),
                         note: hasDeparture ? (delay > 0 ? '+' + delay + ' min delay' : 'On schedule') : 'Awaiting departure',
                         done: hasDeparture,
                         active: false,
@@ -1272,30 +1374,53 @@
             return [
                 {
                     label: 'Inbound',
-                    time: f._scheduledArr ? 'Scheduled: ' + fmt(f._scheduledArr) : 'Inbound',
+                    time: buildTimeSummary([
+                        ['Scheduled', f._scheduledArr],
+                        ['Estimated', f._revisedArr],
+                        ['Predicted', f._predictedArr],
+                        ['Projected', projectedLanding],
+                    ], 'Inbound'),
                     note: f.origin !== DISPLAY_DASH ? 'From ' + f.origin : 'Origin not available',
                     done: hasLanding,
                     active: f._status === 'approaching',
                 },
                 {
                     label: 'Landed',
-                    time: fmt(f._landedAt, 'Pending'),
-                    note: f.airport + (f.gate !== DISPLAY_DASH ? ' · Gate ' + f.gate : ''),
+                    time: buildTimeSummary([
+                        ['Runway', f._runwayArr],
+                        ['Gate in', f._revisedArr],
+                        ['Actual', f._landedAt],
+                        ['Projected', projectedGateIn],
+                    ], 'Pending'),
+                    note: f.airport + (f.gate !== DISPLAY_DASH ? '\nGate ' + f.gate : ''),
                     done: hasLanding,
                     active: f._status === 'landed',
                 },
                 {
                     label: 'On Ground',
-                    time: hasLanding ? (fmt(f._landedAt) + ' → ' + (hasDeparture ? fmt(f._departedAt) : 'now')) : 'Pending',
-                    note: gm !== null ? gm + ' min since landing' : 'Awaiting touchdown',
-                    done: hasDeparture,
+                    time: buildTimeSummary([
+                        ['Arrive', firstValidTime(f._runwayArr, f._landedAt, f._revisedArr, projectedGateIn)],
+                        ['Next out', projectedNextOut],
+                    ], hasLanding ? (fmt(f._landedAt) + ' → now') : 'Pending'),
+                    note: gm !== null
+                        ? gm + ' min since landing'
+                        : (hasLinkedNextLeg ? 'Turnaround plan is linked from the departure board.' : 'Projected turnaround based on current arrival time.'),
+                    done: hasLinkedNextLeg && !!nextLegTime(f),
                     active: f._status === 'on-ground',
                 },
                 {
                     label: 'Next Leg',
-                    time: fmt(f._departedAt, 'Not linked'),
-                    note: hasDeparture ? (delay > 0 ? '+' + delay + ' min delay' : 'On schedule') : 'Outbound leg is only shown when the API returns it.',
-                    done: hasDeparture,
+                    time: buildTimeSummary([
+                        ['Scheduled', f._nextScheduledDep],
+                        ['Estimated', f._nextRevisedDep],
+                        ['Predicted', f._nextPredictedDep],
+                        ['Runway', f._nextRunwayDep],
+                        ['Projected', projectedNextOut],
+                    ], 'Not linked'),
+                    note: hasLinkedNextLeg
+                        ? `${f._nextLegFlight || 'Next flight'}${f._nextLegDest && f._nextLegDest !== DISPLAY_DASH ? ' to ' + f._nextLegDest : ''}`
+                        : 'Projected only. Outbound leg is not returned or could not be matched.',
+                    done: !!nextLegTime(f),
                     active: false,
                 },
             ];
@@ -1353,7 +1478,12 @@
             const delay = f._direction === 'arrival' ? (f._arrDelay || 0) : (f._depDelay || 0);
             const delayLabel = f._direction === 'arrival' ? 'Arrival delay' : 'Departure delay';
             const scheduledLabel = f._direction === 'arrival' ? 'Sched. arrival' : 'Sched. departure';
+            const revisedLabel = f._direction === 'arrival' ? 'Estimated arrival' : 'Estimated departure';
+            const predictedLabel = f._direction === 'arrival' ? 'Predicted arrival' : 'Predicted departure';
+            const runwayLabel = f._direction === 'arrival' ? 'Runway arrival' : 'Runway departure';
+            const projectedLabel = f._direction === 'arrival' ? 'Projected next out' : 'Projected departure';
             const steps = buildTimelineSteps(f, gm, delay);
+            const projectedValue = f._direction === 'arrival' ? projectedNextOutTime(f) : projectedDepartureTime(f);
             document.getElementById('auditEmpty').style.display = 'none';
             const content = document.getElementById('auditContent');
             content.style.display = 'block';
@@ -1397,6 +1527,11 @@
       <tr><td class="dl">Origin</td><td class="dv">${safeText(f.origin)}${f.originName && f.originName !== DISPLAY_DASH ? ' · ' + safeText(f.originName, '') : ''}</td></tr>
       <tr><td class="dl">Destination</td><td class="dv">${safeText(f.dest)}${f.destName && f.destName !== DISPLAY_DASH ? ' · ' + safeText(f.destName, '') : ''}</td></tr>
       <tr><td class="dl">${scheduledLabel}</td><td class="dv">${fmt(f._direction === 'arrival' ? f._scheduledArr : f._scheduledDep)}</td></tr>
+      <tr><td class="dl">${revisedLabel}</td><td class="dv">${fmt(f._direction === 'arrival' ? f._revisedArr : f._revisedDep)}</td></tr>
+      <tr><td class="dl">${predictedLabel}</td><td class="dv">${fmt(f._direction === 'arrival' ? f._predictedArr : f._predictedDep)}</td></tr>
+      <tr><td class="dl">${runwayLabel}</td><td class="dv">${fmt(f._direction === 'arrival' ? f._runwayArr : f._runwayDep)}</td></tr>
+      <tr><td class="dl">${projectedLabel}</td><td class="dv">${fmt(projectedValue)}</td></tr>
+      <tr><td class="dl">Matched next leg</td><td class="dv">${safeText(f._nextLegFlight || DISPLAY_DASH)}${f._nextLegDest && f._nextLegDest !== DISPLAY_DASH ? ' · ' + safeText(f._nextLegDest, '') : ''}</td></tr>
       <tr><td class="dl">Arr. delay</td><td class="dv" style="color:${(f._arrDelay || 0) > 15 ? 'var(--red)' : 'var(--green)'}">${f._arrDelay || 0} min</td></tr>
       <tr><td class="dl">Dep. delay</td><td class="dv" style="color:${(f._depDelay || 0) > 15 ? 'var(--red)' : 'var(--green)'}">${f._depDelay || 0} min</td></tr>
     </table></div>
@@ -1450,16 +1585,25 @@
                     // ── TIME EXTRACTION ──
                     // AeroDataBox v2 wraps times as { utc, local } objects
                     // v1 / some endpoints return plain strings
+                    const arrivalScheduled = extractTime(arr2.scheduledTime) || null;
+                    const arrivalRevised = extractTime(arr2.revisedTime) || extractTime(arr2.actualTime) || null;
+                    const arrivalPredicted = extractTime(arr2.predictedTime) || null;
+                    const arrivalRunway = extractTime(arr2.runwayTime) || null;
+                    const departureScheduled = extractTime(dep.scheduledTime) || null;
+                    const departureRevised = extractTime(dep.revisedTime) || extractTime(dep.actualTime) || null;
+                    const departurePredicted = extractTime(dep.predictedTime) || null;
+                    const departureRunway = extractTime(dep.runwayTime) || null;
+
                     const landedAt = isArr
-                        ? (extractTime(arr2.runwayTime) || extractTime(arr2.actualTime) || null)
+                        ? (arrivalRunway || extractTime(arr2.actualTime) || null)
                         : null;
 
                     const departedAt = isArr
                         ? null
-                        : (extractTime(dep.runwayTime) || extractTime(dep.actualTime) || null);
+                        : (departureRunway || extractTime(dep.actualTime) || null);
 
-                    const scheduledArr = extractTime(arr2.scheduledTime) || null;
-                    const scheduledDep = extractTime(dep.scheduledTime) || null;
+                    const scheduledArr = arrivalScheduled;
+                    const scheduledDep = departureScheduled;
 
                     // ── STATUS ──
                     const sRaw = (f.status || f.movement?.status || '').toLowerCase();
@@ -1467,6 +1611,12 @@
                     const safeDepartedAt = parseTS(departedAt) ? departedAt : null;
                     const safeScheduledArr = parseTS(scheduledArr) ? scheduledArr : null;
                     const safeScheduledDep = parseTS(scheduledDep) ? scheduledDep : null;
+                    const safeRevisedArr = parseTS(arrivalRevised) ? arrivalRevised : null;
+                    const safePredictedArr = parseTS(arrivalPredicted) ? arrivalPredicted : null;
+                    const safeRunwayArr = parseTS(arrivalRunway) ? arrivalRunway : null;
+                    const safeRevisedDep = parseTS(departureRevised) ? departureRevised : null;
+                    const safePredictedDep = parseTS(departurePredicted) ? departurePredicted : null;
+                    const safeRunwayDep = parseTS(departureRunway) ? departureRunway : null;
 
                     let status = 'approaching';
                     if (isArr) {
@@ -1519,6 +1669,18 @@
                         _departedAt: safeDepartedAt,
                         _scheduledArr: safeScheduledArr,
                         _scheduledDep: safeScheduledDep,
+                        _revisedArr: safeRevisedArr,
+                        _predictedArr: safePredictedArr,
+                        _runwayArr: safeRunwayArr,
+                        _revisedDep: safeRevisedDep,
+                        _predictedDep: safePredictedDep,
+                        _runwayDep: safeRunwayDep,
+                        _nextLegFlight: null,
+                        _nextLegDest: null,
+                        _nextScheduledDep: null,
+                        _nextRevisedDep: null,
+                        _nextPredictedDep: null,
+                        _nextRunwayDep: null,
                         _depDelay: normalizeDelay(dep.delay || dep.delayTime),
                         _arrDelay: normalizeDelay(arr2.delay || arr2.delayTime),
                         flight: f.number || f.iataNumber || DISPLAY_DASH,
@@ -1540,6 +1702,39 @@
             };
             if (Array.isArray(raw)) raw.forEach(f => process([f], 'dep'));
             else { process(raw.arrivals || [], 'arr'); process(raw.departures || [], 'dep'); }
+
+            const departures = list.filter(f => f._direction === 'departure');
+            const arrivals = list.filter(f => f._direction === 'arrival');
+
+            arrivals.forEach(arrival => {
+                const arrivalTime = parseTS(arrivalBasisTime(arrival));
+                const match = departures
+                    .filter(dep => {
+                        const sameReg = arrival.reg !== DISPLAY_DASH && dep.reg === arrival.reg;
+                        const sameShip = arrival.shipNo !== DISPLAY_DASH && dep.shipNo === arrival.shipNo;
+                        return sameReg || sameShip;
+                    })
+                    .filter(dep => {
+                        const depTime = parseTS(departureBasisTime(dep));
+                        if (!arrivalTime || !depTime) return true;
+                        return depTime.getTime() >= arrivalTime.getTime() - (30 * 60000);
+                    })
+                    .sort((a, b) => {
+                        const aTime = parseTS(departureBasisTime(a));
+                        const bTime = parseTS(departureBasisTime(b));
+                        return (aTime ? aTime.getTime() : Number.MAX_SAFE_INTEGER) - (bTime ? bTime.getTime() : Number.MAX_SAFE_INTEGER);
+                    })[0];
+
+                if (!match) return;
+
+                arrival._nextLegFlight = match.flight;
+                arrival._nextLegDest = match.dest;
+                arrival._nextScheduledDep = match._scheduledDep;
+                arrival._nextRevisedDep = match._revisedDep;
+                arrival._nextPredictedDep = match._predictedDep;
+                arrival._nextRunwayDep = match._runwayDep;
+            });
+
             return list;
         }
 
@@ -1714,12 +1909,12 @@
             allFlights = [
                 { _id: 'BG001', _direction: 'arrival', _status: 'on-ground', _landedAt: ago(47), _departedAt: null, _scheduledArr: ago(50), _scheduledDep: null, _depDelay: 0, _arrDelay: 0, flight: 'BG001', airline: 'Biman Bangladesh', reg: 'S2-AHM', shipNo: 'HM001', aircraftType: 'Boeing 787-8', airport: 'DAC', gate: 'A3', terminal: '1', baggageBelt: '2', origin: 'DXB', dest: 'DAC', iata: 'BG', icao: 'BBC' },
                 { _id: 'BG007', _direction: 'arrival', _status: 'on-ground', _landedAt: ago(112), _departedAt: null, _scheduledArr: ago(100), _scheduledDep: null, _depDelay: 0, _arrDelay: 12, flight: 'BG007', airline: 'Biman Bangladesh', reg: 'S2-AJN', shipNo: 'JN007', aircraftType: 'Boeing 737-800', airport: 'DAC', gate: 'B1', terminal: '1', baggageBelt: '4', origin: 'CGP', dest: 'DAC', iata: 'BG', icao: 'BBC' },
-                { _id: 'EK582', _direction: 'arrival', _status: 'landed', _landedAt: ago(8), _departedAt: null, _scheduledArr: ago(5), _scheduledDep: null, _depDelay: 0, _arrDelay: 0, flight: 'EK582', airline: 'Emirates', reg: 'A6-EPO', shipNo: 'EPO58', aircraftType: 'Boeing 777-300ER', airport: 'DAC', gate: 'A1', terminal: '1', baggageBelt: '1', origin: 'DXB', dest: 'DAC', iata: 'EK', icao: 'UAE' },
-                { _id: 'QR648', _direction: 'arrival', _status: 'approaching', _landedAt: null, _departedAt: null, _scheduledArr: ahead(18), _scheduledDep: null, _depDelay: 0, _arrDelay: 0, flight: 'QR648', airline: 'Qatar Airways', reg: 'A7-BEG', shipNo: 'BEG64', aircraftType: 'Boeing 787-9', airport: 'DAC', gate: 'A2', terminal: '1', baggageBelt: DISPLAY_DASH, origin: 'DOH', dest: 'DAC', iata: 'QR', icao: 'QTR' },
-                { _id: 'SQ445', _direction: 'departure', _status: 'departed', _landedAt: ago(95), _departedAt: ago(12), _scheduledArr: null, _scheduledDep: ago(17), _depDelay: 5, _arrDelay: 0, flight: 'SQ445', airline: 'Singapore Airlines', reg: '9V-SKB', shipNo: 'SKB44', aircraftType: 'Airbus A350-900', airport: 'DAC', gate: 'B3', terminal: '1', baggageBelt: DISPLAY_DASH, origin: 'DAC', dest: 'SIN', iata: 'SQ', icao: 'SIA' },
+                { _id: 'EK582', _direction: 'arrival', _status: 'landed', _landedAt: ago(8), _departedAt: null, _scheduledArr: ago(5), _scheduledDep: null, _revisedArr: ago(6), _predictedArr: ago(4), _runwayArr: ago(8), _depDelay: 0, _arrDelay: 0, flight: 'EK582', airline: 'Emirates', reg: 'A6-EPO', shipNo: 'EPO58', aircraftType: 'Boeing 777-300ER', airport: 'DAC', gate: 'A1', terminal: '1', baggageBelt: '1', origin: 'DXB', dest: 'DAC', iata: 'EK', icao: 'UAE', _nextLegFlight: null, _nextLegDest: null, _nextScheduledDep: null, _nextRevisedDep: null, _nextPredictedDep: null, _nextRunwayDep: null },
+                { _id: 'QR648', _direction: 'arrival', _status: 'approaching', _landedAt: null, _departedAt: null, _scheduledArr: ahead(18), _scheduledDep: null, _revisedArr: ahead(24), _predictedArr: ahead(20), _runwayArr: ahead(22), _depDelay: 0, _arrDelay: 0, flight: 'QR648', airline: 'Qatar Airways', reg: 'A7-BEG', shipNo: 'BEG64', aircraftType: 'Boeing 787-9', airport: 'DAC', gate: 'A2', terminal: '1', baggageBelt: DISPLAY_DASH, origin: 'DOH', dest: 'DAC', iata: 'QR', icao: 'QTR', _nextLegFlight: 'QR649', _nextLegDest: 'DOH', _nextScheduledDep: ahead(120), _nextRevisedDep: ahead(132), _nextPredictedDep: ahead(126), _nextRunwayDep: null },
+                { _id: 'SQ445', _direction: 'departure', _status: 'departed', _landedAt: ago(95), _departedAt: ago(12), _scheduledArr: null, _scheduledDep: ago(17), _revisedDep: ago(14), _predictedDep: ago(16), _runwayDep: ago(12), _depDelay: 5, _arrDelay: 0, flight: 'SQ445', airline: 'Singapore Airlines', reg: '9V-SKB', shipNo: 'SKB44', aircraftType: 'Airbus A350-900', airport: 'DAC', gate: 'B3', terminal: '1', baggageBelt: DISPLAY_DASH, origin: 'DAC', dest: 'SIN', iata: 'SQ', icao: 'SIA' },
                 { _id: 'TG323', _direction: 'arrival', _status: 'on-ground', _landedAt: ago(63), _departedAt: null, _scheduledArr: ago(60), _scheduledDep: null, _depDelay: 0, _arrDelay: 0, flight: 'TG323', airline: 'Thai Airways', reg: 'HS-TGW', shipNo: 'TGW32', aircraftType: 'Boeing 777-300ER', airport: 'DAC', gate: 'D4', terminal: '1', baggageBelt: '6', origin: 'BKK', dest: 'DAC', iata: 'TG', icao: 'THA' },
-                { _id: 'BS101', _direction: 'departure', _status: 'departed', _landedAt: ago(75), _departedAt: ago(20), _scheduledArr: null, _scheduledDep: ago(20), _depDelay: 0, _arrDelay: 0, flight: 'BS101', airline: 'US-Bangla', reg: 'S2-AJV', shipNo: 'JV101', aircraftType: 'ATR 72-600', airport: 'DAC', gate: 'C2', terminal: '2', baggageBelt: DISPLAY_DASH, origin: 'DAC', dest: 'CGP', iata: 'BS', icao: 'UBG' },
-                { _id: 'MH192', _direction: 'arrival', _status: 'approaching', _landedAt: null, _departedAt: null, _scheduledArr: ahead(35), _scheduledDep: null, _depDelay: 0, _arrDelay: 0, flight: 'MH192', airline: 'Malaysia Airlines', reg: '9M-MXE', shipNo: 'MXE19', aircraftType: 'Airbus A330-300', airport: 'DAC', gate: DISPLAY_DASH, terminal: '1', baggageBelt: DISPLAY_DASH, origin: 'KUL', dest: 'DAC', iata: 'MH', icao: 'MAS' },
+                { _id: 'BS101', _direction: 'departure', _status: 'departed', _landedAt: ago(75), _departedAt: ago(20), _scheduledArr: null, _scheduledDep: ago(20), _revisedDep: ago(20), _predictedDep: ago(18), _runwayDep: ago(20), _depDelay: 0, _arrDelay: 0, flight: 'BS101', airline: 'US-Bangla', reg: 'S2-AJV', shipNo: 'JV101', aircraftType: 'ATR 72-600', airport: 'DAC', gate: 'C2', terminal: '2', baggageBelt: DISPLAY_DASH, origin: 'DAC', dest: 'CGP', iata: 'BS', icao: 'UBG' },
+                { _id: 'MH192', _direction: 'arrival', _status: 'approaching', _landedAt: null, _departedAt: null, _scheduledArr: ahead(35), _scheduledDep: null, _revisedArr: ahead(42), _predictedArr: ahead(38), _runwayArr: ahead(39), _depDelay: 0, _arrDelay: 0, flight: 'MH192', airline: 'Malaysia Airlines', reg: '9M-MXE', shipNo: 'MXE19', aircraftType: 'Airbus A330-300', airport: DISPLAY_DASH, gate: DISPLAY_DASH, terminal: '1', baggageBelt: DISPLAY_DASH, origin: 'KUL', dest: 'DAC', iata: 'MH', icao: 'MAS', _nextLegFlight: null, _nextLegDest: null, _nextScheduledDep: null, _nextRevisedDep: null, _nextPredictedDep: null, _nextRunwayDep: null },
             ];
             renderCards();
             document.getElementById('lastUpdate').textContent = 'Demo mode · ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
