@@ -2,6 +2,7 @@ import { Prisma, PrismaClient } from '../src/generated/prisma-client/client.js';
 import * as argon2 from 'argon2';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { DEFAULT_AIRCRAFT_SEAT_MAPS } from '../src/modules/master-data/aircraft-seat-map.defaults.js';
+import { DynamicFormTemplateStatus } from '../src/generated/prisma-client/enums.js';
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -604,6 +605,307 @@ async function main() {
           businessDate,
           startsAt: new Date(),
           endsAt: new Date(Date.now() + 4 * 60 * 60 * 1000),
+        },
+      });
+    }
+  }
+
+  const dynamicFormSeeds = [
+    {
+      title: 'Cabin Quality Audit',
+      description:
+        'Inspect cabin presentation, overhead bins, seat areas, and final operational remarks.',
+      category: 'Cabin Quality',
+      formType: 'SURVEY',
+      status: DynamicFormTemplateStatus.PUBLISHED,
+      stationCode: 'JFK',
+      createdByUid: 'sup.user',
+      questions: [
+        {
+          id: 'cq_gate',
+          type: 'short-answer',
+          title: 'Gate / location',
+          description: 'Where is this inspection taking place?',
+          required: true,
+          options: [],
+        },
+        {
+          id: 'cq_ship',
+          type: 'short-answer',
+          title: 'Ship / tail number',
+          description: 'Example: N751DN',
+          required: true,
+          options: [],
+        },
+        {
+          id: 'cq_front_galley',
+          type: 'multiple-choice',
+          title: 'Front galley overall state',
+          description: 'Choose the current presentation status.',
+          required: true,
+          options: ['Pass', 'Fail', 'Needs Review'],
+        },
+        {
+          id: 'cq_areas',
+          type: 'checkboxes',
+          title: 'Areas checked',
+          description: 'Select all inspected areas.',
+          required: true,
+          options: [
+            'Overhead bins',
+            'Seat pockets',
+            'Tray tables',
+            'IFE screens',
+          ],
+        },
+        {
+          id: 'cq_notes',
+          type: 'paragraph',
+          title: 'Inspector notes',
+          description: 'Add any comments or findings.',
+          required: false,
+          options: [],
+        },
+      ],
+      submissions: [
+        {
+          submittedByUid: 'employee.user',
+          answers: {
+            cq_gate: 'JFK A1',
+            cq_ship: 'N751DN',
+            cq_front_galley: 'Pass',
+            cq_areas: ['Overhead bins', 'Tray tables', 'IFE screens'],
+            cq_notes: 'Cabin looked ready for boarding. One seat pocket needed a quick wipe.',
+          },
+        },
+      ],
+    },
+    {
+      title: 'LAV Safety Observation',
+      description:
+        'Verify lavatory safety equipment, servicing posture, and maintenance notes.',
+      category: 'Safety',
+      formType: 'SURVEY',
+      status: DynamicFormTemplateStatus.PUBLISHED,
+      stationCode: 'JFK',
+      createdByUid: 'sup.user',
+      questions: [
+        {
+          id: 'ls_position',
+          type: 'dropdown',
+          title: 'Lavatory position',
+          description: 'Select the position being inspected.',
+          required: true,
+          options: ['Forward', 'Mid', 'Aft'],
+        },
+        {
+          id: 'ls_equipment',
+          type: 'multiple-choice',
+          title: 'Safety equipment present',
+          description: 'Confirm detectors, placards, and extinguisher.',
+          required: true,
+          options: ['Pass', 'Fail'],
+        },
+        {
+          id: 'ls_readiness',
+          type: 'rating',
+          title: 'Overall readiness score',
+          description: 'Rate the lavatory condition from 1 to 5.',
+          required: false,
+          options: [],
+        },
+        {
+          id: 'ls_notes',
+          type: 'paragraph',
+          title: 'Maintenance notes',
+          description: 'Capture any issue details for follow-up.',
+          required: false,
+          options: [],
+        },
+      ],
+      submissions: [
+        {
+          submittedByUid: 'employee.user',
+          answers: {
+            ls_position: 'Aft',
+            ls_equipment: 'Pass',
+            ls_readiness: 4,
+            ls_notes: 'Placards and detector checked. Minor cosmetic wear on panel edge.',
+          },
+        },
+      ],
+    },
+    {
+      title: 'Cabin Security Search Training',
+      description:
+        'Run a training search, capture tested areas, and submit the debrief summary.',
+      category: 'Security',
+      formType: 'SURVEY',
+      status: DynamicFormTemplateStatus.DRAFT,
+      stationCode: 'LAX',
+      createdByUid: 'gm.user',
+      questions: [
+        {
+          id: 'cs_ship',
+          type: 'short-answer',
+          title: 'Ship / tail number',
+          description: 'Enter the assigned aircraft.',
+          required: true,
+          options: [],
+        },
+        {
+          id: 'cs_hidden_count',
+          type: 'short-answer',
+          title: 'Number of hidden items',
+          description: 'Keep this hidden from the team until the end.',
+          required: true,
+          options: [],
+        },
+        {
+          id: 'cs_areas',
+          type: 'checkboxes',
+          title: 'Areas tested today',
+          description: 'Choose all tested locations.',
+          required: true,
+          options: [
+            'Galley carts',
+            'Life vests under seats',
+            'Overhead bins',
+            'Lavatory waste flaps',
+            'Flight deck access',
+          ],
+        },
+        {
+          id: 'cs_debrief',
+          type: 'paragraph',
+          title: 'Training debrief',
+          description: 'Summarize misses and coaching notes.',
+          required: true,
+          options: [],
+        },
+      ],
+      submissions: [],
+    },
+  ] as const;
+
+  for (const formSeed of dynamicFormSeeds) {
+    const station = stationByCode[formSeed.stationCode];
+    const creator = userByUid[formSeed.createdByUid];
+    if (!station || !creator) {
+      continue;
+    }
+
+    const existingTemplate = await prisma.dynamicFormTemplate.findFirst({
+      where: {
+        stationId: station.id,
+        title: formSeed.title,
+      },
+      select: {
+        id: true,
+        publishedAt: true,
+      },
+    });
+
+    const template = existingTemplate
+      ? await prisma.dynamicFormTemplate.update({
+          where: { id: existingTemplate.id },
+          data: {
+            title: formSeed.title,
+            description: formSeed.description,
+            category: formSeed.category,
+            formType: formSeed.formType,
+            status: formSeed.status,
+            questionCount: formSeed.questions.length,
+            estimatedMinutes: Math.max(1, Math.ceil(formSeed.questions.length / 3)),
+            schemaJson: formSeed.questions as unknown as Prisma.InputJsonValue,
+            createdByUserId: creator.id,
+            updatedByUserId: creator.id,
+            publishedAt:
+              formSeed.status === DynamicFormTemplateStatus.PUBLISHED
+                ? existingTemplate.publishedAt ?? new Date()
+                : null,
+            archivedAt: null,
+          },
+          select: {
+            id: true,
+          },
+        })
+      : await prisma.dynamicFormTemplate.create({
+          data: {
+            stationId: station.id,
+            title: formSeed.title,
+            description: formSeed.description,
+            category: formSeed.category,
+            formType: formSeed.formType,
+            status: formSeed.status,
+            version: 1,
+            questionCount: formSeed.questions.length,
+            estimatedMinutes: Math.max(1, Math.ceil(formSeed.questions.length / 3)),
+            schemaJson: formSeed.questions as unknown as Prisma.InputJsonValue,
+            createdByUserId: creator.id,
+            updatedByUserId: creator.id,
+            publishedAt:
+              formSeed.status === DynamicFormTemplateStatus.PUBLISHED
+                ? new Date()
+                : null,
+          },
+          select: {
+            id: true,
+          },
+        });
+
+    const existingSubmissionCount = await prisma.dynamicFormSubmission.count({
+      where: {
+        templateId: template.id,
+      },
+    });
+
+    if (existingSubmissionCount > 0) {
+      continue;
+    }
+
+    for (const submissionSeed of formSeed.submissions) {
+      const submitter = userByUid[submissionSeed.submittedByUid];
+      if (!submitter) {
+        continue;
+      }
+
+      const submitterProfile = await prisma.user.findUnique({
+        where: { id: submitter.id },
+        select: {
+          firstName: true,
+          lastName: true,
+        },
+      });
+
+      const submitterAccess = await prisma.userStationAccess.findUnique({
+        where: {
+          userId_stationId: {
+            userId: submitter.id,
+            stationId: station.id,
+          },
+        },
+        include: {
+          role: true,
+        },
+      });
+
+      if (!submitterProfile || !submitterAccess) {
+        continue;
+      }
+
+      await prisma.dynamicFormSubmission.create({
+        data: {
+          templateId: template.id,
+          stationId: station.id,
+          submittedByUserId: submitter.id,
+          submittedByName:
+            `${submitterProfile.firstName} ${submitterProfile.lastName}`.trim(),
+          submittedByRole: submitterAccess.role.name,
+          answersJson: submissionSeed.answers as unknown as Prisma.InputJsonValue,
+          metadataJson: {
+            source: 'seed',
+          } as Prisma.InputJsonValue,
         },
       });
     }
