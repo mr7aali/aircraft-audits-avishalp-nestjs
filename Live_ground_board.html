@@ -1,0 +1,1533 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Live Ground Board — Flight Audit System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;500;700;800&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0c10;
+            --bg2: #10141c;
+            --bg3: #161b26;
+            --border: rgba(255, 255, 255, 0.07);
+            --border2: rgba(255, 255, 255, 0.13);
+            --text: #f0f2f7;
+            --muted: #6b7280;
+            --dim: #374151;
+            --green: #22c55e;
+            --green-dim: rgba(34, 197, 94, 0.12);
+            --amber: #f59e0b;
+            --amber-dim: rgba(245, 158, 11, 0.12);
+            --blue: #3b82f6;
+            --blue-dim: rgba(59, 130, 246, 0.12);
+            --purple: #a78bfa;
+            --purple-dim: rgba(167, 139, 250, 0.12);
+            --red: #ef4444;
+            --red-dim: rgba(239, 68, 68, 0.12);
+            --mono: 'JetBrains Mono', monospace;
+            --sans: 'Syne', sans-serif;
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--sans);
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 20px 32px;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            border: 1px solid var(--border2);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg3);
+        }
+
+        .logo-text {
+            font-size: 15px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            color: var(--text);
+        }
+
+        .logo-sub {
+            font-size: 11px;
+            color: var(--muted);
+            font-family: var(--mono);
+            letter-spacing: 0.08em;
+        }
+
+        .header-right {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .live-pill {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            border-radius: 20px;
+            font-size: 11px;
+            font-family: var(--mono);
+            color: var(--green);
+            background: var(--green-dim);
+        }
+
+        .live-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--green);
+            animation: blink 1.6s ease-in-out infinite;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.2;
+            }
+        }
+
+        .last-update {
+            font-size: 11px;
+            font-family: var(--mono);
+            color: var(--muted);
+        }
+
+        /* CONFIG BAR */
+        .config-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 32px;
+            background: var(--bg2);
+            border-bottom: 1px solid var(--border);
+            flex-wrap: wrap;
+        }
+
+        .config-bar label {
+            font-size: 11px;
+            font-family: var(--mono);
+            color: var(--muted);
+            white-space: nowrap;
+        }
+
+        .config-bar input {
+            background: var(--bg3);
+            border: 1px solid var(--border2);
+            border-radius: 6px;
+            color: var(--text);
+            font-family: var(--mono);
+            font-size: 12px;
+            padding: 7px 12px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .config-bar input:focus {
+            border-color: var(--blue);
+        }
+
+        .config-bar input[type="date"],
+        .config-bar input[type="time"] {
+            color-scheme: dark;
+        }
+
+        #dateIn {
+            width: 140px;
+        }
+
+        #timeFrom,
+        #timeTo {
+            width: 90px;
+        }
+
+        .config-divider {
+            width: 1px;
+            height: 24px;
+            background: var(--border2);
+            flex-shrink: 0;
+        }
+
+        /* AIRPORT INPUT WRAPPER */
+        .airport-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        #airportIn {
+            width: 100px;
+            text-transform: uppercase;
+            padding-right: 28px;
+        }
+
+        #airportIn.has-match {
+            border-color: var(--green);
+        }
+
+        #airportIn.no-match {
+            border-color: var(--amber);
+        }
+
+        .airport-resolved {
+            position: absolute;
+            right: 7px;
+            font-size: 10px;
+            font-family: var(--mono);
+            color: var(--green);
+            pointer-events: none;
+        }
+
+        .airport-hint {
+            font-size: 11px;
+            font-family: var(--mono);
+            color: var(--amber);
+            display: none;
+        }
+
+        /* QUICK BTNS */
+        .quick-btns {
+            display: flex;
+            gap: 4px;
+        }
+
+        .qbtn {
+            background: transparent;
+            border: 1px solid var(--border2);
+            border-radius: 20px;
+            color: var(--muted);
+            font-family: var(--mono);
+            font-size: 10px;
+            padding: 3px 9px;
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+
+        .qbtn:hover {
+            color: var(--text);
+            border-color: var(--blue);
+        }
+
+        .qbtn.active {
+            color: var(--blue);
+            border-color: var(--blue);
+            background: var(--blue-dim);
+        }
+
+        .window-note {
+            font-size: 11px;
+            font-family: var(--mono);
+            color: var(--muted);
+            padding: 3px 9px;
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            white-space: nowrap;
+        }
+
+        .btn-watch {
+            background: var(--blue);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-family: var(--sans);
+            font-size: 13px;
+            font-weight: 700;
+            padding: 8px 20px;
+            cursor: pointer;
+            letter-spacing: 0.04em;
+            transition: opacity 0.2s, transform 0.1s;
+        }
+
+        .btn-watch:hover {
+            opacity: 0.88;
+        }
+
+        .btn-watch:active {
+            transform: scale(0.97);
+        }
+
+        .btn-stop {
+            background: transparent;
+            color: var(--red);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 6px;
+            font-family: var(--sans);
+            font-size: 12px;
+            padding: 7px 14px;
+            cursor: pointer;
+            display: none;
+        }
+
+        .btn-stop:hover {
+            background: var(--red-dim);
+        }
+
+        .err-msg {
+            font-size: 12px;
+            font-family: var(--mono);
+            color: var(--red);
+            flex-basis: 100%;
+            display: none;
+        }
+
+        /* FILTER BAR */
+        .filter-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 32px;
+            border-bottom: 1px solid var(--border);
+            flex-wrap: wrap;
+        }
+
+        .search-box {
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-family: var(--mono);
+            font-size: 12px;
+            padding: 7px 12px;
+            outline: none;
+            width: 220px;
+            transition: border-color 0.2s;
+        }
+
+        .search-box:focus {
+            border-color: var(--blue);
+        }
+
+        .fbtns {
+            display: flex;
+            gap: 4px;
+            margin-left: 8px;
+        }
+
+        .fbtn {
+            background: transparent;
+            border: 1px solid var(--border2);
+            border-radius: 20px;
+            color: var(--muted);
+            font-family: var(--mono);
+            font-size: 11px;
+            padding: 4px 12px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .fbtn:hover {
+            color: var(--text);
+        }
+
+        .fbtn.active {
+            border-color: var(--blue);
+            color: var(--blue);
+            background: var(--blue-dim);
+        }
+
+        .fbtn.f-landed.active {
+            border-color: var(--green);
+            color: var(--green);
+            background: var(--green-dim);
+        }
+
+        .fbtn.f-onground.active {
+            border-color: var(--amber);
+            color: var(--amber);
+            background: var(--amber-dim);
+        }
+
+        .fbtn.f-departed.active {
+            border-color: var(--purple);
+            color: var(--purple);
+            background: var(--purple-dim);
+        }
+
+        .count-badge {
+            font-size: 11px;
+            font-family: var(--mono);
+            color: var(--muted);
+            margin-left: auto;
+        }
+
+        /* MAIN */
+        .main {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            height: calc(100vh - 175px);
+            overflow: hidden;
+        }
+
+        .cards-area {
+            overflow-y: auto;
+            padding: 24px 24px 24px 32px;
+            scrollbar-width: thin;
+            scrollbar-color: var(--dim) transparent;
+        }
+
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 12px;
+        }
+
+        .empty-state {
+            grid-column: 1/-1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 80px 0;
+            color: var(--muted);
+        }
+
+        .empty-state svg {
+            opacity: 0.3;
+        }
+
+        .empty-state p {
+            font-family: var(--mono);
+            font-size: 13px;
+            text-align: center;
+            line-height: 1.7;
+        }
+
+        /* FLIGHT CARD */
+        .fcard {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            cursor: pointer;
+            transition: border-color 0.18s, background 0.18s;
+            animation: cardIn 0.3s ease both;
+            position: relative;
+            overflow: hidden;
+        }
+
+        @keyframes cardIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fcard:hover {
+            border-color: var(--border2);
+            background: var(--bg3);
+        }
+
+        .fcard.selected {
+            border-color: var(--blue);
+            background: var(--bg3);
+        }
+
+        .fcard.selected::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: var(--blue);
+            border-radius: 12px 0 0 12px;
+        }
+
+        .fcard-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .fcard-flight {
+            font-size: 18px;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            color: var(--text);
+        }
+
+        .fcard-airline {
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 2px;
+            font-weight: 400;
+        }
+
+        .status-pill {
+            font-family: var(--mono);
+            font-size: 10px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            flex-shrink: 0;
+        }
+
+        .s-approaching {
+            background: var(--purple-dim);
+            color: var(--purple);
+            border: 1px solid rgba(167, 139, 250, 0.25);
+        }
+
+        .s-landed {
+            background: var(--green-dim);
+            color: var(--green);
+            border: 1px solid rgba(34, 197, 94, 0.25);
+        }
+
+        .s-onground {
+            background: var(--amber-dim);
+            color: var(--amber);
+            border: 1px solid rgba(245, 158, 11, 0.25);
+        }
+
+        .s-departed {
+            background: var(--blue-dim);
+            color: var(--blue);
+            border: 1px solid rgba(59, 130, 246, 0.25);
+        }
+
+        .fcard-rows {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin-bottom: 12px;
+        }
+
+        .fcard-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .fcard-lbl {
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        .fcard-val {
+            font-size: 12px;
+            font-family: var(--mono);
+            color: var(--text);
+            font-weight: 500;
+        }
+
+        .ground-timer {
+            padding-top: 10px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .timer-label {
+            font-size: 13px;
+            font-family: var(--mono);
+            font-weight: 700;
+            min-width: 40px;
+        }
+
+        .timer-track {
+            flex: 1;
+            height: 3px;
+            background: var(--dim);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .timer-fill {
+            height: 3px;
+            border-radius: 2px;
+            transition: width 1s linear;
+        }
+
+        .timer-note {
+            font-size: 10px;
+            color: var(--muted);
+            font-family: var(--mono);
+        }
+
+        /* AUDIT PANEL */
+        .audit-panel {
+            border-left: 1px solid var(--border);
+            background: var(--bg2);
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--dim) transparent;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .audit-empty {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            color: var(--muted);
+            padding: 40px;
+        }
+
+        .audit-empty svg {
+            opacity: 0.2;
+        }
+
+        .audit-empty p {
+            font-family: var(--mono);
+            font-size: 12px;
+            text-align: center;
+            line-height: 1.6;
+        }
+
+        .audit-content {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .audit-header-sec {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .plane-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            background: var(--blue-dim);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .audit-flight-name {
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+        }
+
+        .audit-flight-sub {
+            font-size: 12px;
+            font-family: var(--mono);
+            color: var(--muted);
+            margin-top: 3px;
+        }
+
+        .close-btn {
+            margin-left: auto;
+            background: transparent;
+            border: 1px solid var(--border2);
+            border-radius: 6px;
+            color: var(--muted);
+            font-size: 12px;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-family: var(--mono);
+            flex-shrink: 0;
+        }
+
+        .close-btn:hover {
+            color: var(--text);
+            border-color: var(--muted);
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .mcard {
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 14px;
+        }
+
+        .mcard-lbl {
+            font-size: 10px;
+            font-family: var(--mono);
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            margin-bottom: 5px;
+        }
+
+        .mcard-val {
+            font-size: 22px;
+            font-weight: 800;
+            font-family: var(--mono);
+        }
+
+        .mcard-unit {
+            font-size: 12px;
+            font-weight: 400;
+            color: var(--muted);
+            margin-left: 3px;
+        }
+
+        .tl-section-title {
+            font-size: 11px;
+            font-family: var(--mono);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--muted);
+            margin-bottom: 14px;
+        }
+
+        .timeline {
+            position: relative;
+            padding-left: 28px;
+        }
+
+        .tl-step {
+            position: relative;
+            padding-bottom: 22px;
+        }
+
+        .tl-step:last-child {
+            padding-bottom: 0;
+        }
+
+        .tl-node {
+            position: absolute;
+            left: -28px;
+            top: 3px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid var(--dim);
+            background: var(--bg2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1;
+        }
+
+        .tl-node-inner {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--dim);
+        }
+
+        .tl-node.done {
+            border-color: var(--green);
+        }
+
+        .tl-node.done .tl-node-inner {
+            background: var(--green);
+        }
+
+        .tl-node.active {
+            border-color: var(--amber);
+            animation: nodePulse 1.5s ease-in-out infinite;
+        }
+
+        .tl-node.active .tl-node-inner {
+            background: var(--amber);
+        }
+
+        @keyframes nodePulse {
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4);
+            }
+
+            50% {
+                box-shadow: 0 0 0 5px rgba(245, 158, 11, 0);
+            }
+        }
+
+        .tl-connector {
+            position: absolute;
+            left: -21px;
+            top: 19px;
+            width: 1px;
+            height: calc(100% - 12px);
+            background: var(--border2);
+        }
+
+        .tl-step:last-child .tl-connector {
+            display: none;
+        }
+
+        .tl-step-head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 3px;
+        }
+
+        .tl-step-label {
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+        }
+
+        .tl-live-tag {
+            font-size: 9px;
+            font-family: var(--mono);
+            background: var(--amber-dim);
+            color: var(--amber);
+            border: 1px solid rgba(245, 158, 11, 0.25);
+            padding: 1px 6px;
+            border-radius: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .tl-step-time {
+            font-size: 12px;
+            font-family: var(--mono);
+            color: var(--muted);
+        }
+
+        .tl-step-note {
+            font-size: 11px;
+            color: var(--dim);
+            font-family: var(--mono);
+            margin-top: 2px;
+        }
+
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        .details-table td {
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .details-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .details-table .dl {
+            color: var(--muted);
+            font-family: var(--mono);
+            font-size: 11px;
+            width: 42%;
+        }
+
+        .details-table .dv {
+            color: var(--text);
+            font-family: var(--mono);
+            font-weight: 500;
+        }
+
+        .loading-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--blue);
+            transform-origin: left;
+            transform: scaleX(0);
+            transition: transform 0.4s ease;
+            z-index: 200;
+        }
+
+        .loading-bar.active {
+            transform: scaleX(0.8);
+        }
+
+        .loading-bar.done {
+            transform: scaleX(1);
+            transition: transform 0.1s;
+            opacity: 0;
+        }
+
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--dim);
+            border-radius: 2px;
+        }
+
+        @media(max-width:768px) {
+            .main {
+                grid-template-columns: 1fr;
+            }
+
+            .audit-panel {
+                border-left: none;
+                border-top: 1px solid var(--border);
+                height: auto;
+            }
+
+            header {
+                padding: 14px 16px;
+            }
+
+            .config-bar,
+            .filter-bar {
+                padding: 10px 16px;
+            }
+
+            .cards-area {
+                padding: 16px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="loading-bar" id="loadingBar"></div>
+
+    <header>
+        <div class="logo">
+            <div class="logo-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.8"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path
+                        d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" />
+                </svg>
+            </div>
+            <div>
+                <div class="logo-text">GROUNDBOARD</div>
+                <div class="logo-sub">flight audit system</div>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="live-pill" id="livePill" style="display:none;">
+                <div class="live-dot"></div>LIVE
+            </div>
+            <div class="last-update" id="lastUpdate">—</div>
+        </div>
+    </header>
+
+    <div class="config-bar" style="flex-wrap:wrap;gap:10px;">
+        <label>AIRPORT</label>
+        <div class="airport-wrap">
+            <input id="airportIn" type="text" placeholder="JFK or KJFK" maxlength="4" oninput="onAirportInput(this)"
+                style="width:110px;text-transform:uppercase;" />
+            <span class="airport-resolved" id="resolvedLabel"></span>
+        </div>
+        <span class="airport-hint" id="airportHint"></span>
+
+        <div class="config-divider"></div>
+
+        <label>RAPIDAPI KEY</label>
+        <input id="apiKey" type="password" placeholder="Paste your AeroDataBox RapidAPI key…" style="width:250px;" />
+
+        <div class="config-divider"></div>
+
+        <label>DATE</label>
+        <input id="dateIn" type="date" />
+        <label>FROM</label>
+        <input id="timeFrom" type="time" value="00:00" />
+        <label>TO</label>
+        <input id="timeTo" type="time" value="23:59" />
+
+        <div class="quick-btns">
+            <button class="qbtn" onclick="setQuick('now')" id="q-now">Now ±3h</button>
+            <button class="qbtn" onclick="setQuick('morning')" id="q-morning">Morning</button>
+            <button class="qbtn" onclick="setQuick('afternoon')" id="q-afternoon">Afternoon</button>
+            <button class="qbtn" onclick="setQuick('evening')" id="q-evening">Evening</button>
+            <button class="qbtn" onclick="setQuick('allday')" id="q-allday">All day</button>
+        </div>
+
+        <span class="window-note" id="windowNote">—</span>
+        <button class="btn-watch" onclick="startLive()">Watch Live</button>
+        <button class="btn-stop" id="stopBtn" onclick="stopLive()">Stop</button>
+        <span class="err-msg" id="errMsg"></span>
+    </div>
+
+    <div class="filter-bar">
+        <input class="search-box" id="searchIn" type="text" placeholder="Search flight / airline / reg…"
+            oninput="renderCards()" />
+        <div class="fbtns">
+            <button class="fbtn active" id="f-all" onclick="setFilter('all',this)">All</button>
+            <button class="fbtn f-landed" id="f-landed" onclick="setFilter('landed',this)">Landed</button>
+            <button class="fbtn f-onground" id="f-onground" onclick="setFilter('on-ground',this)">On Ground</button>
+            <button class="fbtn f-departed" id="f-departed" onclick="setFilter('departed',this)">Departed</button>
+            <button class="fbtn" id="f-approaching" onclick="setFilter('approaching',this)">Approaching</button>
+        </div>
+        <span class="count-badge" id="countBadge">0 flights</span>
+    </div>
+
+    <div class="main">
+        <div class="cards-area">
+            <div class="cards-grid" id="cardsGrid">
+                <div class="empty-state">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path
+                            d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" />
+                    </svg>
+                    <p>Enter any airport code — 3-letter IATA (JFK)<br />or 4-letter ICAO (KJFK) — both
+                        work.<br /><br />Demo data loads without an API key.</p>
+                </div>
+            </div>
+        </div>
+        <div class="audit-panel" id="auditPanel">
+            <div class="audit-empty" id="auditEmpty">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <path d="M9 9h6M9 12h6M9 15h4" />
+                </svg>
+                <p>Click any flight card<br />to open its audit log.</p>
+            </div>
+            <div id="auditContent" style="display:none;"></div>
+        </div>
+    </div>
+
+    <script>
+        // ─── IATA → ICAO lookup table (most common airports worldwide) ───
+        const IATA_TO_ICAO = {
+            // USA
+            JFK: 'KJFK', LAX: 'KLAX', ORD: 'KORD', ATL: 'KATL', DFW: 'KDFW', DEN: 'KDEN',
+            SFO: 'KSFO', SEA: 'KSEA', LAS: 'KLAS', MIA: 'KMIA', CLT: 'KCLT', PHX: 'KPHX',
+            IAH: 'KIAH', MCO: 'KMCO', EWR: 'KEWR', MSP: 'KMSP', DTW: 'KDTW', BOS: 'KBOS',
+            PHL: 'KPHL', LGA: 'KLGA', BWI: 'KBWI', SLC: 'KSLC', SAN: 'KSAN', IAD: 'KIAD',
+            DCA: 'KDCA', MDW: 'KMDW', HNL: 'PHNL', ANC: 'PANC', PDX: 'KPDX', STL: 'KSTL',
+            // Europe
+            LHR: 'EGLL', LGW: 'EGKK', STN: 'EGSS', LTN: 'EGGW', MAN: 'EGCC', EDI: 'EGPH',
+            CDG: 'LFPG', ORY: 'LFPO', AMS: 'EHAM', FRA: 'EDDF', MUC: 'EDDM', BER: 'EDDB',
+            MAD: 'LEMD', BCN: 'LEBL', FCO: 'LIRF', MXP: 'LIMC', ZRH: 'LSZH', VIE: 'LOWW',
+            CPH: 'EKCH', ARN: 'ESSA', HEL: 'EFHK', OSL: 'ENGM', LIS: 'LPPT', DUB: 'EIDW',
+            ATH: 'LGAV', IST: 'LTFM', SAW: 'LTFJ', BRU: 'EBBR', WAW: 'EPWA', PRG: 'LKPR',
+            BUD: 'LHBP', OTP: 'LROP', SOF: 'LBSF',
+            // Middle East
+            DXB: 'OMDB', AUH: 'OMAA', DOH: 'OTHH', KWI: 'OKBK', BAH: 'OBBI', AMM: 'OJAI',
+            BEY: 'OLBA', TLV: 'LLBG', RUH: 'OERK', JED: 'OEJN', MCT: 'OOMS',
+            // Asia
+            SIN: 'WSSS', KUL: 'WMKK', BKK: 'VTBS', HKG: 'VHHH', ICN: 'RKSI', NRT: 'RJAA',
+            HND: 'RJTT', PEK: 'ZBAA', PVG: 'ZSPD', CAN: 'ZGGG', CTU: 'ZUUU', XIY: 'ZLXY',
+            DEL: 'VIDP', BOM: 'VABB', MAA: 'VOMM', HYD: 'VOHS', BLR: 'VOBL', CCU: 'VECC',
+            CGP: 'VGEG', DAC: 'VGHS', CMB: 'VCBI', KTM: 'VNKT', MNL: 'RPLL', CGK: 'WIII',
+            DPS: 'WADD', KHI: 'OPKC', LHE: 'OPLA', ISB: 'OPIS',
+            // Bangladesh
+            ZYL: 'VGSY', CXB: 'VGCB', JSR: 'VGJR', BZL: 'VGBR', RJH: 'VGRJ',
+            // Africa & Others
+            CAI: 'HECA', JNB: 'FAOR', CPT: 'FACT', NBO: 'HKJK', ADD: 'HAAB', LOS: 'DNMM',
+            ACC: 'DGAA', CMN: 'GMMN', TUN: 'DTTA', ALG: 'DAAG',
+            // Canada & others
+            YYZ: 'CYYZ', YVR: 'CYVR', YUL: 'CYUL', YYC: 'CYYC', YEG: 'CYEG',
+            GRU: 'SBGR', BOG: 'SKBO', LIM: 'SPIM', SCL: 'SCEL', EZE: 'SAEZ', MEX: 'MMMX',
+            SYD: 'YSSY', MEL: 'YMML', BNE: 'YBBN', AKL: 'NZAA',
+        };
+
+        let allFlights = [];
+        let selectedId = null;
+        let activeFilter = 'all';
+        let refreshInterval = null;
+        let demoInterval = null;
+
+        // ─── AIRPORT INPUT: auto-detect IATA vs ICAO ───
+        function onAirportInput(el) {
+            const val = el.value.toUpperCase().trim();
+            const hint = document.getElementById('airportHint');
+            const resolved = document.getElementById('resolvedLabel');
+            el.value = val;
+
+            if (val.length === 3 && IATA_TO_ICAO[val]) {
+                el.classList.remove('no-match');
+                el.classList.add('has-match');
+                resolved.textContent = '→ ' + IATA_TO_ICAO[val];
+                hint.style.display = 'none';
+            } else if (val.length === 3 && !IATA_TO_ICAO[val]) {
+                el.classList.remove('has-match');
+                el.classList.add('no-match');
+                resolved.textContent = '';
+                hint.textContent = 'Unknown IATA code — try 4-letter ICAO (e.g. KJFK)';
+                hint.style.display = 'inline';
+            } else if (val.length === 4) {
+                el.classList.remove('has-match', 'no-match');
+                resolved.textContent = '';
+                hint.style.display = 'none';
+            } else {
+                el.classList.remove('has-match', 'no-match');
+                resolved.textContent = '';
+                hint.style.display = 'none';
+            }
+        }
+
+        function resolveICAO() {
+            const val = document.getElementById('airportIn').value.toUpperCase().trim();
+            if (val.length === 3) return IATA_TO_ICAO[val] || null;
+            if (val.length === 4) return val;
+            return null;
+        }
+
+        // ─── FILTERS ───
+        function setFilter(f, btn) {
+            activeFilter = f;
+            document.querySelectorAll('.fbtn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            renderCards();
+        }
+
+        // Robust parser — handles all AeroDataBox timestamp formats:
+        // "2026-04-19T14:32:00Z"  ISO with Z
+        // "2026-04-19T14:32:00"   ISO no timezone
+        // "2026-04-19 14:32"      space-separated (most common from AeroDataBox)
+        // "2026-04-19 14:32:00"   space-separated with seconds
+        function parseTS(val) {
+            if (!val) return null;
+            if (typeof val !== 'string') return null;
+            // Replace space separator with T so new Date() can parse it
+            const normalized = val.trim().replace(' ', 'T');
+            const d = new Date(normalized);
+            return isNaN(d.getTime()) ? null : d;
+        }
+
+        function fmt(val) {
+            const d = parseTS(val);
+            if (!d) return '—';
+            return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function fmtFull(val) {
+            const d = parseTS(val);
+            if (!d) return '—';
+            return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        }
+
+        function groundMins(f) {
+            const land = parseTS(f._landedAt);
+            if (!land) return null;
+            const end = f._departedAt ? (parseTS(f._departedAt) || new Date()) : new Date();
+            const mins = Math.round((end - land) / 60000);
+            return mins >= 0 ? mins : null;
+        }
+
+        function timerColor(mins) {
+            if (mins < 45) return '#22c55e';
+            if (mins < 90) return '#f59e0b';
+            return '#ef4444';
+        }
+
+        function statusClass(s) {
+            if (s === 'landed') return 's-landed';
+            if (s === 'on-ground') return 's-onground';
+            if (s === 'departed') return 's-departed';
+            return 's-approaching';
+        }
+
+        function statusLabel(s) {
+            if (s === 'on-ground') return 'On Ground';
+            return s.charAt(0).toUpperCase() + s.slice(1);
+        }
+
+        // ─── CARDS ───
+        function renderCards() {
+            const grid = document.getElementById('cardsGrid');
+            const q = document.getElementById('searchIn').value.toLowerCase();
+            let data = allFlights.filter(f => {
+                if (activeFilter !== 'all' && f._status !== activeFilter) return false;
+                if (q) return (f.flight || '').toLowerCase().includes(q) ||
+                    (f.airline || '').toLowerCase().includes(q) ||
+                    (f.reg || '').toLowerCase().includes(q);
+                return true;
+            });
+            document.getElementById('countBadge').textContent = data.length + ' flight' + (data.length !== 1 ? 's' : '');
+            if (!data.length) {
+                grid.innerHTML = `<div class="empty-state"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg><p>No flights match your filter.</p></div>`;
+                return;
+            }
+            grid.innerHTML = data.map(f => {
+                const gm = (f._status === 'on-ground' || f._status === 'landed') ? groundMins(f) : null;
+                const pct = gm !== null ? Math.min(Math.round(gm / 120 * 100), 100) : 0;
+                const tColor = gm !== null ? timerColor(gm) : '#374151';
+                const sel = selectedId === f._id ? 'selected' : '';
+                return `<div class="fcard ${sel}" onclick="selectFlight('${f._id}')">
+      <div class="fcard-head">
+        <div><div class="fcard-flight">${f.flight}</div><div class="fcard-airline">${f.airline}</div></div>
+        <span class="status-pill ${statusClass(f._status)}">${statusLabel(f._status)}</span>
+      </div>
+      <div class="fcard-rows">
+        <div class="fcard-row"><span class="fcard-lbl">Reg.</span><span class="fcard-val">${f.reg}</span></div>
+        <div class="fcard-row"><span class="fcard-lbl">Airport</span><span class="fcard-val">${f.airport}</span></div>
+        <div class="fcard-row"><span class="fcard-lbl">Gate</span><span class="fcard-val">${f.gate}</span></div>
+        <div class="fcard-row"><span class="fcard-lbl">Landed</span><span class="fcard-val">${fmt(f._landedAt)}</span></div>
+      </div>
+      ${gm !== null
+                        ? `<div class="ground-timer"><span class="timer-label" style="color:${tColor};">${gm}m</span><div class="timer-track"><div class="timer-fill" style="width:${pct}%;background:${tColor};"></div></div><span class="timer-note">on ground</span></div>`
+                        : `<div class="ground-timer"><span style="font-size:11px;font-family:var(--mono);color:var(--muted);">${f._status === 'departed' ? 'Dep. ' + fmt(f._departedAt) : 'Awaiting arrival'}</span></div>`
+                    }
+    </div>`;
+            }).join('');
+        }
+
+        function selectFlight(id) {
+            selectedId = id;
+            renderCards();
+            const f = allFlights.find(x => x._id === id);
+            if (f) renderAudit(f);
+        }
+
+        function renderAudit(f) {
+            const gm = groundMins(f);
+            const delay = f._depDelay || 0;
+            const steps = [
+                { label: 'Approach', time: f._scheduledArr ? 'Scheduled: ' + fmt(f._scheduledArr) : 'Inbound', note: f.origin && f.origin !== '—' ? 'From ' + f.origin : '', done: true, active: f._status === 'approaching' },
+                { label: 'Landed', time: fmt(f._landedAt) || 'Pending', note: f.airport + (f.gate !== '—' ? ' · Gate ' + f.gate : ''), done: !!parseTS(f._landedAt), active: f._status === 'landed' },
+                { label: 'On Ground', time: parseTS(f._landedAt) ? (fmt(f._landedAt) + ' → ' + (parseTS(f._departedAt) ? fmt(f._departedAt) : 'now')) : '—', note: gm !== null ? gm + ' min turnaround' : 'Ongoing', done: f._status === 'departed', active: f._status === 'on-ground' },
+                { label: 'Departed', time: fmt(f._departedAt) || 'Pending', note: delay > 0 ? '+' + delay + ' min delay' : (parseTS(f._departedAt) ? 'On schedule' : 'Awaiting departure'), done: !!parseTS(f._departedAt), active: false },
+            ];
+            document.getElementById('auditEmpty').style.display = 'none';
+            const content = document.getElementById('auditContent');
+            content.style.display = 'block';
+            content.innerHTML = `<div class="audit-content">
+    <div class="audit-header-sec">
+      <div class="plane-avatar"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg></div>
+      <div><div class="audit-flight-name">${f.flight}</div><div class="audit-flight-sub">${f.airline} · ${f.aircraftType}</div></div>
+      <button class="close-btn" onclick="closeAudit()">close ×</button>
+    </div>
+    <div class="metrics-grid">
+      <div class="mcard"><div class="mcard-lbl">Ground time</div><div class="mcard-val" style="color:${gm !== null ? timerColor(gm) : 'var(--muted)'}">${gm !== null ? gm : '—'}<span class="mcard-unit">${gm !== null ? 'min' : ''}</span></div></div>
+      <div class="mcard"><div class="mcard-lbl">Delay</div><div class="mcard-val" style="color:${delay > 15 ? '#ef4444' : '#22c55e'}">${delay > 0 ? '+' + delay : '0'}<span class="mcard-unit">min</span></div></div>
+      <div class="mcard"><div class="mcard-lbl">Landed</div><div class="mcard-val" style="font-size:18px;">${fmt(f._landedAt) || '—'}</div></div>
+      <div class="mcard"><div class="mcard-lbl">Departed</div><div class="mcard-val" style="font-size:18px;">${fmt(f._departedAt) || '—'}</div></div>
+    </div>
+    <div><div class="tl-section-title">Ground event timeline</div>
+    <div class="timeline">${steps.map(s => `
+      <div class="tl-step">
+        <div class="tl-node ${s.done ? 'done' : s.active ? 'active' : ''}"><div class="tl-node-inner"></div></div>
+        <div class="tl-connector"></div>
+        <div class="tl-step-head">
+          <span class="tl-step-label" style="color:${s.active ? '#f59e0b' : s.done ? '#f0f2f7' : '#6b7280'}">${s.label}</span>
+          ${s.active ? '<span class="tl-live-tag">live</span>' : ''}
+        </div>
+        <div class="tl-step-time">${s.time}</div>
+        <div class="tl-step-note">${s.note}</div>
+      </div>`).join('')}</div></div>
+    <div><div class="tl-section-title">Aircraft details</div>
+    <table class="details-table">
+      <tr><td class="dl">Registration</td><td class="dv">${f.reg}</td></tr>
+      <tr><td class="dl">Ship no.</td><td class="dv">${f.shipNo}</td></tr>
+      <tr><td class="dl">Aircraft type</td><td class="dv">${f.aircraftType}</td></tr>
+      <tr><td class="dl">Airport</td><td class="dv">${f.airport}</td></tr>
+      <tr><td class="dl">Gate</td><td class="dv">${f.gate}</td></tr>
+      <tr><td class="dl">Terminal</td><td class="dv">${f.terminal}</td></tr>
+      <tr><td class="dl">Origin</td><td class="dv">${f.origin}</td></tr>
+      <tr><td class="dl">Destination</td><td class="dv">${f.dest}</td></tr>
+      <tr><td class="dl">IATA / ICAO</td><td class="dv">${f.iata} / ${f.icao}</td></tr>
+    </table></div>
+  </div>`;
+        }
+
+        function closeAudit() {
+            selectedId = null;
+            document.getElementById('auditEmpty').style.display = 'flex';
+            document.getElementById('auditContent').style.display = 'none';
+            renderCards();
+        }
+
+        // ─── PARSE ───
+        // AeroDataBox time fields can be nested objects like:
+        //   { "utc": "2026-04-19 14:32", "local": "2026-04-19 10:32-04:00" }
+        // OR plain strings: "2026-04-19 14:32"
+        // This helper safely extracts the best available string
+        function extractTime(obj) {
+            if (!obj) return null;
+            if (typeof obj === 'string') return obj;
+            // prefer local time so display matches the airport timezone
+            if (obj.local) return obj.local;
+            if (obj.utc) return obj.utc;
+            return null;
+        }
+
+        function parseFlights(raw) {
+            const list = [];
+            const process = (arr, dir) => {
+                (arr || []).forEach((f, i) => {
+                    const dep = f.departure || {};
+                    const arr2 = f.arrival || {};
+                    const isArr = dir === 'arr';
+
+                    // Try every known field name AeroDataBox uses for actual landing/departure times
+                    const landedAt = isArr
+                        ? (extractTime(arr2.actualTime) || extractTime(arr2.runwayTime) || extractTime(arr2.scheduledTime) || null)
+                        : null;
+
+                    const departedAt = !isArr
+                        ? (extractTime(dep.actualTime) || extractTime(dep.runwayTime) || null)
+                        : null;
+
+                    const scheduledArr = isArr
+                        ? (extractTime(arr2.scheduledTime) || null)
+                        : (extractTime(dep.scheduledTime) || null);
+
+                    // Status detection — also use movement.status if top-level status missing
+                    let status = 'approaching';
+                    const sRaw = (f.status || f.movement?.status || '').toLowerCase();
+                    if (sRaw.includes('land') || sRaw.includes('arrived')) status = 'landed';
+                    else if (sRaw.includes('ground') || sRaw.includes('boarding') || sRaw.includes('taxiing')) status = 'on-ground';
+                    else if (sRaw.includes('depart') || sRaw.includes('airborne') || sRaw.includes('en-route')) status = 'departed';
+                    else if (landedAt && !departedAt) status = 'on-ground';
+                    else if (landedAt && departedAt) status = 'departed';
+                    else if (landedAt) status = 'landed';
+
+                    // Validate timestamps — discard unparseable ones
+                    const safeLandedAt = parseTS(landedAt) ? landedAt : null;
+                    const safeDepartedAt = parseTS(departedAt) ? departedAt : null;
+                    const safeScheduled = parseTS(scheduledArr) ? scheduledArr : null;
+
+                    list.push({
+                        _id: (f.number || f.iataNumber || 'FL') + i + dir,
+                        _status: status,
+                        _landedAt: safeLandedAt,
+                        _departedAt: safeDepartedAt,
+                        _scheduledArr: safeScheduled,
+                        _depDelay: dep.delay || dep.delayTime || 0,
+                        flight: f.number || f.iataNumber || '—',
+                        airline: f.airline?.name || '—',
+                        reg: f.aircraft?.reg || f.aircraft?.registration || f.aircraft?.modeS || '—',
+                        shipNo: f.aircraft?.modeS || f.aircraft?.serialNo || '—',
+                        aircraftType: f.aircraft?.model || f.aircraft?.type || f.aircraft?.icaoCode || '—',
+                        airport: isArr ? (arr2.airport?.iata || arr2.airport?.icao || '—') : (dep.airport?.iata || dep.airport?.icao || '—'),
+                        gate: isArr ? (arr2.gate || dep.gate || '—') : (dep.gate || arr2.gate || '—'),
+                        terminal: isArr ? (arr2.terminal || dep.terminal || '—') : (dep.terminal || arr2.terminal || '—'),
+                        origin: arr2.airport?.iata || dep.airport?.iata || '—',
+                        dest: dep.airport?.iata || arr2.airport?.iata || '—',
+                        iata: f.airline?.iata || '—',
+                        icao: f.airline?.icao || '—',
+                    });
+                });
+            };
+            if (Array.isArray(raw)) raw.forEach(f => process([f], 'dep'));
+            else { process(raw.arrivals || [], 'arr'); process(raw.departures || [], 'dep'); }
+            return list;
+        }
+
+        // ─── TIME WINDOW ───
+        function pad(n) { return String(n).padStart(2, '0'); }
+        function fmtDate(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+        function fmtTime(d) { return `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+
+        function initDatePicker() {
+            document.getElementById('dateIn').value = fmtDate(new Date());
+            setQuick('now');
+        }
+
+        function setQuick(preset) {
+            document.querySelectorAll('.qbtn').forEach(b => b.classList.remove('active'));
+            const btn = document.getElementById('q-' + preset);
+            if (btn) btn.classList.add('active');
+            const now = new Date();
+            if (preset === 'now') {
+                document.getElementById('dateIn').value = fmtDate(now);
+                document.getElementById('timeFrom').value = fmtTime(new Date(now.getTime() - 90 * 60000));
+                document.getElementById('timeTo').value = fmtTime(new Date(now.getTime() + 3 * 60 * 60000));
+            } else if (preset === 'morning') { document.getElementById('timeFrom').value = '05:00'; document.getElementById('timeTo').value = '12:00'; }
+            else if (preset === 'afternoon') { document.getElementById('timeFrom').value = '12:00'; document.getElementById('timeTo').value = '18:00'; }
+            else if (preset === 'evening') { document.getElementById('timeFrom').value = '18:00'; document.getElementById('timeTo').value = '23:59'; }
+            else if (preset === 'allday') { document.getElementById('timeFrom').value = '00:00'; document.getElementById('timeTo').value = '23:59'; }
+            updateWindowNote();
+        }
+
+        function updateWindowNote() {
+            const date = document.getElementById('dateIn').value;
+            const from = document.getElementById('timeFrom').value;
+            const to = document.getElementById('timeTo').value;
+            if (!date || !from || !to) { document.getElementById('windowNote').textContent = '—'; return; }
+            const d = new Date(date + 'T12:00:00');
+            document.getElementById('windowNote').textContent =
+                d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }) + '  ' + from + ' → ' + to;
+        }
+
+        ['dateIn', 'timeFrom', 'timeTo'].forEach(id => {
+            document.getElementById(id)?.addEventListener('change', () => {
+                document.querySelectorAll('.qbtn').forEach(b => b.classList.remove('active'));
+                updateWindowNote();
+            });
+        });
+
+        function buildTimeWindow() {
+            const date = document.getElementById('dateIn').value || fmtDate(new Date());
+            const from = document.getElementById('timeFrom').value || '00:00';
+            const to = document.getElementById('timeTo').value || '23:59';
+            return { startStr: `${date}T${from}`, endStr: `${date}T${to}` };
+        }
+
+        // ─── FETCH ───
+        async function fetchFlights() {
+            const icao = resolveICAO();
+            const apiKey = document.getElementById('apiKey').value.trim();
+
+            if (!apiKey) { loadDemo(); return; }
+
+            if (!icao) {
+                const errEl = document.getElementById('errMsg');
+                errEl.textContent = 'Please enter a valid airport code (e.g. JFK or KJFK).';
+                errEl.style.display = 'block';
+                return;
+            }
+
+            const bar = document.getElementById('loadingBar');
+            bar.classList.remove('done'); bar.classList.add('active');
+            const errEl = document.getElementById('errMsg');
+            errEl.style.display = 'none'; errEl.textContent = '';
+
+            const { startStr, endStr } = buildTimeWindow();
+            const url = `https://aerodatabox.p.rapidapi.com/flights/airports/icao/${icao}/${startStr}/${endStr}?withLeg=true&direction=Both&withCancelled=false&withCodeshared=true&withCargo=false&withPrivate=false`;
+
+            try {
+                const res = await fetch(url, {
+                    headers: { 'x-rapidapi-host': 'aerodatabox.p.rapidapi.com', 'x-rapidapi-key': apiKey }
+                });
+                const rawText = await res.text();
+
+                if (!res.ok) {
+                    let detail = '';
+                    try { detail = JSON.parse(rawText)?.message || rawText.slice(0, 120); } catch (_) { detail = rawText.slice(0, 120); }
+                    if (res.status === 401 || res.status === 403) throw new Error('Invalid or expired API key (HTTP ' + res.status + ').');
+                    if (res.status === 404) throw new Error('Airport "' + icao + '" not found. Double-check the ICAO code.');
+                    if (res.status === 429) throw new Error('Rate limit hit. Wait a moment and try again.');
+                    throw new Error('API error ' + res.status + (detail ? ': ' + detail : '.'));
+                }
+
+                if (!rawText || rawText.trim() === '') {
+                    throw new Error('No flights found for ' + icao + ' in ' + startStr + ' → ' + endStr + '. Try "All day" or a different date.');
+                }
+
+                let json;
+                try { json = JSON.parse(rawText); } catch (e) {
+                    throw new Error('Could not parse API response: ' + rawText.slice(0, 80));
+                }
+
+                allFlights = parseFlights(json);
+
+                if (!allFlights.length) {
+                    errEl.textContent = 'API returned 0 flights for ' + icao + ' in ' + startStr + ' → ' + endStr + '. Try "All day" or a different date.';
+                    errEl.style.display = 'block';
+                    return;
+                }
+
+                renderCards();
+                document.getElementById('lastUpdate').textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' · ' + icao;
+                document.getElementById('livePill').style.display = 'flex';
+                if (selectedId) { const f = allFlights.find(x => x._id === selectedId); if (f) renderAudit(f); }
+
+            } catch (e) {
+                console.error('fetchFlights error:', e);
+                errEl.textContent = e.message;
+                errEl.style.display = 'block';
+            } finally {
+                bar.classList.remove('active'); bar.classList.add('done');
+                setTimeout(() => bar.classList.remove('done'), 600);
+            }
+        }
+
+        function startLive() {
+            if (refreshInterval) clearInterval(refreshInterval);
+            if (demoInterval) { clearInterval(demoInterval); demoInterval = null; }
+            document.getElementById('stopBtn').style.display = 'block';
+            fetchFlights();
+            refreshInterval = setInterval(fetchFlights, 30000);
+        }
+
+        function stopLive() {
+            if (refreshInterval) clearInterval(refreshInterval);
+            refreshInterval = null;
+            document.getElementById('stopBtn').style.display = 'none';
+            document.getElementById('livePill').style.display = 'none';
+            document.getElementById('lastUpdate').textContent = 'Stopped';
+        }
+
+        // ─── DEMO ───
+        function loadDemo() {
+            if (demoInterval) clearInterval(demoInterval);
+            const now = new Date();
+            const ago = m => new Date(now - m * 60000).toISOString();
+            const ahead = m => new Date(now.getTime() + m * 60000).toISOString();
+            allFlights = [
+                { _id: 'BG001', _status: 'on-ground', _landedAt: ago(47), _departedAt: null, _scheduledArr: ago(50), _depDelay: 0, flight: 'BG001', airline: 'Biman Bangladesh', reg: 'S2-AHM', shipNo: 'HM001', aircraftType: 'Boeing 787-8', airport: 'DAC', gate: 'A3', terminal: '1', origin: 'DXB', dest: 'DAC', iata: 'BG', icao: 'BBC' },
+                { _id: 'BG007', _status: 'on-ground', _landedAt: ago(112), _departedAt: null, _scheduledArr: ago(100), _depDelay: 12, flight: 'BG007', airline: 'Biman Bangladesh', reg: 'S2-AJN', shipNo: 'JN007', aircraftType: 'Boeing 737-800', airport: 'DAC', gate: 'B1', terminal: '1', origin: 'CGP', dest: 'DAC', iata: 'BG', icao: 'BBC' },
+                { _id: 'EK582', _status: 'landed', _landedAt: ago(8), _departedAt: null, _scheduledArr: ago(5), _depDelay: 0, flight: 'EK582', airline: 'Emirates', reg: 'A6-EPO', shipNo: 'EPO58', aircraftType: 'Boeing 777-300ER', airport: 'DAC', gate: 'A1', terminal: '1', origin: 'DXB', dest: 'DAC', iata: 'EK', icao: 'UAE' },
+                { _id: 'QR648', _status: 'approaching', _landedAt: null, _departedAt: null, _scheduledArr: ahead(18), _depDelay: 0, flight: 'QR648', airline: 'Qatar Airways', reg: 'A7-BEG', shipNo: 'BEG64', aircraftType: 'Boeing 787-9', airport: 'DAC', gate: 'A2', terminal: '1', origin: 'DOH', dest: 'DAC', iata: 'QR', icao: 'QTR' },
+                { _id: 'SQ445', _status: 'departed', _landedAt: ago(95), _departedAt: ago(12), _scheduledArr: ago(100), _depDelay: 5, flight: 'SQ445', airline: 'Singapore Airlines', reg: '9V-SKB', shipNo: 'SKB44', aircraftType: 'Airbus A350-900', airport: 'DAC', gate: 'B3', terminal: '1', origin: 'SIN', dest: 'DAC', iata: 'SQ', icao: 'SIA' },
+                { _id: 'TG323', _status: 'on-ground', _landedAt: ago(63), _departedAt: null, _scheduledArr: ago(60), _depDelay: 0, flight: 'TG323', airline: 'Thai Airways', reg: 'HS-TGW', shipNo: 'TGW32', aircraftType: 'Boeing 777-300ER', airport: 'DAC', gate: 'D4', terminal: '1', origin: 'BKK', dest: 'DAC', iata: 'TG', icao: 'THA' },
+                { _id: 'BS101', _status: 'departed', _landedAt: ago(75), _departedAt: ago(20), _scheduledArr: ago(80), _depDelay: 0, flight: 'BS101', airline: 'US-Bangla', reg: 'S2-AJV', shipNo: 'JV101', aircraftType: 'ATR 72-600', airport: 'DAC', gate: 'C2', terminal: '2', origin: 'CGP', dest: 'DAC', iata: 'BS', icao: 'UBG' },
+                { _id: 'MH192', _status: 'approaching', _landedAt: null, _departedAt: null, _scheduledArr: ahead(35), _depDelay: 0, flight: 'MH192', airline: 'Malaysia Airlines', reg: '9M-MXE', shipNo: 'MXE19', aircraftType: 'Airbus A330-300', airport: 'DAC', gate: '—', terminal: '1', origin: 'KUL', dest: 'DAC', iata: 'MH', icao: 'MAS' },
+            ];
+            renderCards();
+            document.getElementById('lastUpdate').textContent = 'Demo · ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            document.getElementById('livePill').style.display = 'flex';
+            demoInterval = setInterval(() => {
+                renderCards();
+                if (selectedId) { const f = allFlights.find(x => x._id === selectedId); if (f) renderAudit(f); }
+                document.getElementById('lastUpdate').textContent = 'Demo · ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            }, 10000);
+        }
+
+        initDatePicker();
+        loadDemo();
+    </script>
+</body>
+
+</html>
