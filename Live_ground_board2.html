@@ -1175,6 +1175,7 @@
         }
         function safeText(v, fallback = DISPLAY_DASH) {
             if (v === null || v === undefined || v === '') return fallback;
+            if (typeof v === 'string' && ['null', 'undefined', 'nan'].includes(v.trim().toLowerCase())) return fallback;
             return escapeHtml(v);
         }
         function normalizeDelay(v) { const p = Number(v); return Number.isFinite(p) ? p : 0; }
@@ -1237,8 +1238,27 @@
                 || f?.movement?.registration
                 || DISPLAY_DASH;
         }
+        function extractShipNumber(f) {
+            return f?.aircraft?.modeS
+                || f?.aircraft?.modes
+                || f?.aircraft?.mode_s
+                || f?.aircraft?.serialNo
+                || f?.aircraft?.icao24
+                || f?.aircraft?.hex
+                || f?.modeS
+                || f?.mode_s
+                || f?.icao24
+                || f?.hex
+                || f?.movement?.aircraft?.modeS
+                || f?.movement?.aircraft?.icao24
+                || f?.movement?.modeS
+                || f?.movement?.icao24
+                || DISPLAY_DASH;
+        }
         function hasDisplayValue(v) {
-            return v !== null && v !== undefined && v !== '' && v !== DISPLAY_DASH;
+            if (v === null || v === undefined || v === '' || v === DISPLAY_DASH) return false;
+            if (typeof v === 'string' && ['null', 'undefined', 'nan'].includes(v.trim().toLowerCase())) return false;
+            return true;
         }
         function preferValue(current, incoming) {
             return hasDisplayValue(incoming) && !hasDisplayValue(current) ? incoming : current;
@@ -1266,7 +1286,7 @@
                         : keep._status;
 
             [
-                'flight', 'airline', 'reg', 'shipNo', 'acType', 'aircraftType', 'airport', 'gate', 'terminal', 'baggageBelt',
+                'flight', 'callSign', 'airline', 'reg', 'shipNo', 'acType', 'aircraftType', 'airport', 'gate', 'terminal', 'baggageBelt',
                 'origin', 'dest', 'originName', 'destName', 'iata', 'icao',
                 '_nextLegFlight', '_nextLegDest', '_nextLegDestName', '_nextLegGate', '_nextLegTerminal', '_nextLegAirline',
                 '_nextLegDataSource', '_nextLegLookupMode', '_nextLegLookupValue'
@@ -1285,6 +1305,150 @@
             keep._arrDelay = Math.max(Number(keep._arrDelay) || 0, Number(other._arrDelay) || 0);
 
             return keep;
+        }
+        function roundedMinuteStamp(value, minuteStep = 5) {
+            const d = parseTS(value);
+            if (!d) return '';
+            const roundedMinutes = Math.round(d.getMinutes() / minuteStep) * minuteStep;
+            d.setSeconds(0, 0);
+            d.setMinutes(roundedMinutes);
+            return d.toISOString().slice(0, 16);
+        }
+        function siblingFlightKey(f) {
+            const basisTime = f._direction === 'departure'
+                ? firstValidTime(f._scheduledDep, f._revisedDep, f._predictedDep, f._departedAt)
+                : firstValidTime(f._scheduledArr, f._revisedArr, f._predictedArr, f._landedAt);
+            return [
+                f._direction,
+                roundedMinuteStamp(basisTime),
+                f.origin || '',
+                f.dest || '',
+                f.terminal || '',
+                f.aircraftType || '',
+            ].join('|');
+        }
+        function enrichSiblingFlights(list) {
+            const groups = {};
+            list.forEach(f => {
+                const key = siblingFlightKey(f);
+                if (!key.replace(/\|/g, '')) return;
+                (groups[key] ||= []).push(f);
+            });
+
+            Object.values(groups).forEach(group => {
+                if (group.length < 2) return;
+                const richest = group
+                    .slice()
+                    .sort((a, b) => flightDataScore(b) - flightDataScore(a))[0];
+
+                group.forEach(f => {
+                    if (f === richest) return;
+                    [
+                        'reg', 'shipNo', 'gate', 'terminal', 'baggageBelt',
+                        '_revisedArr', '_predictedArr', '_runwayArr',
+                        '_revisedDep', '_predictedDep', '_runwayDep'
+                    ].forEach(key => {
+                        if (!hasDisplayValue(f[key]) && hasDisplayValue(richest[key])) f[key] = richest[key];
+                    });
+                });
+            });
+
+            return list;
+        }
+        function resolvedFlightNumber(value) {
+            return normalizeFlightNumber(value || '');
+        }
+        function resolveAircraftIdentity(f) {
+            let resolvedReg = hasDisplayValue(f?.reg) ? f.reg : DISPLAY_DASH;
+            let resolvedShipNo = hasDisplayValue(f?.shipNo) ? f.shipNo : DISPLAY_DASH;
+
+            if (hasDisplayValue(resolvedReg) && hasDisplayValue(resolvedShipNo)) {
+                return { reg: resolvedReg, shipNo: resolvedShipNo };
+            }
+
+            const baseFlight = resolvedFlightNumber(f?.flight);
+            const baseCallSign = resolvedFlightNumber(f?.callSign);
+            const baseBasis = parseTS(f?._direction === 'departure' ? departureBasisTime(f) : arrivalBasisTime(f));
+
+            function adopt(reg, shipNo) {
+                if (!hasDisplayValue(resolvedReg) && hasDisplayValue(reg)) resolvedReg = reg;
+                if (!hasDisplayValue(resolvedShipNo) && hasDisplayValue(shipNo)) resolvedShipNo = shipNo;
+            }
+
+            function scoreMatch(candidate) {
+                if (!candidate) return -1;
+                let score = 0;
+
+                const candidateFlight = resolvedFlightNumber(candidate.flight || candidate.number || candidate.iataNumber);
+                const candidateCallSign = resolvedFlightNumber(candidate.callSign);
+                if (baseFlight && candidateFlight && baseFlight === candidateFlight) score += 8;
+                if (baseCallSign && candidateCallSign && baseCallSign === candidateCallSign) score += 8;
+
+                const candidateDirection = candidate._direction || null;
+                if (candidateDirection && f?._direction && candidateDirection === f._direction) score += 1;
+
+                const candidateOrigin = candidate.origin || airportCode(candidate.departure?.airport) || '';
+                const candidateDest = candidate.dest || airportCode(candidate.arrival?.airport) || '';
+                if (hasDisplayValue(f?.origin) && hasDisplayValue(candidateOrigin) && f.origin === candidateOrigin) score += 2;
+                if (hasDisplayValue(f?.dest) && hasDisplayValue(candidateDest) && f.dest === candidateDest) score += 2;
+                if (hasDisplayValue(f?.terminal) && hasDisplayValue(candidate.terminal) && f.terminal === candidate.terminal) score += 1;
+                if (hasDisplayValue(f?.aircraftType) && hasDisplayValue(candidate.aircraftType || candidate.aircraft?.model) && f.aircraftType === (candidate.aircraftType || candidate.aircraft?.model)) score += 1;
+
+                const candidateBasisRaw = candidate._direction === 'departure'
+                    ? departureBasisTime(candidate)
+                    : candidate._direction === 'arrival'
+                        ? arrivalBasisTime(candidate)
+                        : extractTime(candidate.departure?.scheduledTime) || extractTime(candidate.arrival?.scheduledTime);
+                const candidateBasis = parseTS(candidateBasisRaw);
+                if (baseBasis && candidateBasis) {
+                    const deltaMinutes = Math.abs(baseBasis.getTime() - candidateBasis.getTime()) / 60000;
+                    if (deltaMinutes <= 10) score += 4;
+                    else if (deltaMinutes <= 30) score += 2;
+                    else if (deltaMinutes <= 60) score += 1;
+                }
+
+                if (!hasDisplayValue(candidate.reg) && !hasDisplayValue(candidate.shipNo) && !hasDisplayValue(candidate.aircraft?.reg) && !hasDisplayValue(candidate.aircraft?.modeS)) {
+                    score -= 2;
+                }
+
+                return score;
+            }
+
+            const directRaw = rawFlightMap[f?._id];
+            if (directRaw) adopt(extractRegistration(directRaw), extractShipNumber(directRaw));
+
+            if (hasDisplayValue(resolvedReg) && hasDisplayValue(resolvedShipNo)) {
+                return { reg: resolvedReg, shipNo: resolvedShipNo };
+            }
+
+            let bestCandidate = null;
+            let bestScore = -1;
+
+            allFlights.forEach(candidate => {
+                if (!candidate || candidate === f) return;
+                const score = scoreMatch(candidate);
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestCandidate = candidate;
+                }
+            });
+
+            Object.values(rawFlightMap).forEach(candidate => {
+                const score = scoreMatch(candidate);
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestCandidate = candidate;
+                }
+            });
+
+            if (bestCandidate && bestScore >= 8) {
+                adopt(extractRegistration(bestCandidate), extractShipNumber(bestCandidate));
+            }
+
+            return {
+                reg: hasDisplayValue(resolvedReg) ? resolvedReg : DISPLAY_DASH,
+                shipNo: hasDisplayValue(resolvedShipNo) ? resolvedShipNo : DISPLAY_DASH,
+            };
         }
         function hasTime(v) { return !!parseTS(v); }
         function firstValidTime(...vals) { return vals.find(hasTime) || null; }
@@ -1400,7 +1564,7 @@
         async function fetchNextLegByReg(f) {
             const apiKey = document.getElementById('apiKey').value.trim();
             if (!apiKey) return { source: 'none' };
-            const reg = f.reg;
+            const reg = resolveAircraftIdentity(f).reg;
             const flightNum = normalizeFlightNumber(f.flight);
             const lookupDate = fmtDate(new Date());
 
@@ -1705,7 +1869,11 @@
             const q = document.getElementById('searchIn').value.toLowerCase();
             let data = allFlights.filter(f => {
                 if (activeFilter !== 'all' && f._status !== activeFilter) return false;
-                if (q) return (f.flight || '').toLowerCase().includes(q) || (f.airline || '').toLowerCase().includes(q) || (f.reg || '').toLowerCase().includes(q);
+                const ids = resolveAircraftIdentity(f);
+                if (q) return (f.flight || '').toLowerCase().includes(q)
+                    || (f.airline || '').toLowerCase().includes(q)
+                    || String(ids.reg || '').toLowerCase().includes(q)
+                    || String(ids.shipNo || '').toLowerCase().includes(q);
                 return true;
             });
             document.getElementById('countBadge').textContent = data.length + ' flight' + (data.length !== 1 ? 's' : '');
@@ -1721,13 +1889,15 @@
                 const airportText = cardAirportValue(f);
                 const gateText = hasDisplayValue(f.gate) ? f.gate : DISPLAY_DASH;
                 const terminalText = cardTerminalValue(f);
+                const ids = resolveAircraftIdentity(f);
                 return `<div class="fcard ${sel}" onclick="selectFlight('${f._id}')">
   <div class="fcard-head">
     <div><div class="fcard-flight">${safeText(f.flight)}</div><div class="fcard-airline">${safeText(f.airline)}</div><div class="fcard-route">${cardRouteValue(f)}</div></div>
     <span class="status-pill ${statusClass(f._status)}">${statusLabel(f._status)}</span>
   </div>
   <div class="fcard-rows">
-    <div class="fcard-row"><span class="fcard-lbl">Reg.</span><span class="fcard-val">${safeText(f.reg)}</span></div>
+    <div class="fcard-row"><span class="fcard-lbl">Reg.</span><span class="fcard-val">${safeText(ids.reg)}</span></div>
+    <div class="fcard-row"><span class="fcard-lbl">Ship No</span><span class="fcard-val">${safeText(ids.shipNo)}</span></div>
     <div class="fcard-row"><span class="fcard-lbl">Airport</span><span class="fcard-val">${safeText(airportText)}</span></div>
     <div class="fcard-row"><span class="fcard-lbl">Gate</span><span class="fcard-val">${safeText(gateText)}</span></div>
     <div class="fcard-row"><span class="fcard-lbl">Terminal</span><span class="fcard-val">${safeText(terminalText)}</span></div>
@@ -1773,6 +1943,7 @@
         function renderAudit(f, loading = false, regResult = null) {
             const gm = groundMins(f);
             const delay = f._direction === 'arrival' ? (f._arrDelay || 0) : (f._depDelay || 0);
+            const ids = resolveAircraftIdentity(f);
             const delayLabel = f._direction === 'arrival' ? 'Arrival delay' : 'Departure delay';
             const scheduledLabel = f._direction === 'arrival' ? 'Sched. arrival' : 'Sched. departure';
             const revisedLabel = f._direction === 'arrival' ? 'Estimated arrival' : 'Estimated departure';
@@ -1787,14 +1958,14 @@
             let bannerHtml = '';
             if (f._direction === 'arrival') {
                 if (loading) {
-                    const loadingMode = f.reg && f.reg !== DISPLAY_DASH
-                        ? `registration <strong>${safeText(f.reg)}</strong>`
+                    const loadingMode = ids.reg && ids.reg !== DISPLAY_DASH
+                        ? `registration <strong>${safeText(ids.reg)}</strong>`
                         : `flight number <strong>${safeText(f.flight)}</strong>`;
                     bannerHtml = `<div class="data-source-banner dsb-projected"><span class="tl-spinner" style="display:inline-block;"></span>&nbsp;Fetching real next-leg data by ${loadingMode}…</div>`;
                 } else if (isNextLegReal) {
                     const lookupText = f._nextLegLookupMode === 'flight-number'
                         ? `flight number <strong>${safeText(f._nextLegLookupValue || f.flight)}</strong> (no registration in API data)`
-                        : `registration <strong>${safeText(f._nextLegLookupValue || f.reg)}</strong>`;
+                        : `registration <strong>${safeText(f._nextLegLookupValue || ids.reg)}</strong>`;
                     bannerHtml = `<div class="data-source-banner dsb-real"><span class="dsb-icon">✓</span> Next Leg times are real API data looked up by ${lookupText}</div>`;
                 } else if (!document.getElementById('apiKey').value.trim()) {
                     bannerHtml = `<div class="data-source-banner dsb-projected"><span class="dsb-icon">⚠</span> Demo mode — Next Leg times are projected estimates only</div>`;
@@ -1813,9 +1984,9 @@
                     const attemptedLookup = regResult?.lookupMode === 'flight-number'
                         ? `Looked up by flight number ${safeText(regResult.lookupValue || f.flight)}.`
                         : regResult?.lookupMode === 'reg'
-                            ? `Looked up by registration ${safeText(regResult.lookupValue || f.reg)}.`
-                            : (f.reg && f.reg !== DISPLAY_DASH
-                                ? `Looked up by registration ${safeText(f.reg)}.`
+                            ? `Looked up by registration ${safeText(regResult.lookupValue || ids.reg)}.`
+                            : (ids.reg && ids.reg !== DISPLAY_DASH
+                                ? `Looked up by registration ${safeText(ids.reg)}.`
                                 : `Looked up by flight number ${safeText(f.flight)}.`);
                     bannerHtml = `<div class="data-source-banner dsb-projected"><span class="dsb-icon">⚠</span> Next Leg projected — ${attemptedLookup} ${reasonText}</div>`;
                 }
@@ -1863,8 +2034,8 @@ ${steps.map(s => `
   <tr><td class="dl">Airline</td><td class="dv">${safeText(f.airline)}</td></tr>
   <tr><td class="dl">Direction</td><td class="dv">${safeText(f._direction)}</td></tr>
   <tr><td class="dl">IATA / ICAO</td><td class="dv">${safeText(f.iata)} / ${safeText(f.icao)}</td></tr>
-  <tr><td class="dl">Registration</td><td class="dv" style="color:${f.reg === DISPLAY_DASH ? 'var(--muted)' : 'var(--text)'}">${safeText(f.reg)}</td></tr>
-  <tr><td class="dl">Mode-S / Ship</td><td class="dv" style="color:${f.shipNo === DISPLAY_DASH ? 'var(--muted)' : 'var(--text)'}">${safeText(f.shipNo)}</td></tr>
+  <tr><td class="dl">Registration</td><td class="dv" style="color:${ids.reg === DISPLAY_DASH ? 'var(--muted)' : 'var(--text)'}">${safeText(ids.reg)}</td></tr>
+  <tr><td class="dl">Mode-S / Ship</td><td class="dv" style="color:${ids.shipNo === DISPLAY_DASH ? 'var(--muted)' : 'var(--text)'}">${safeText(ids.shipNo)}</td></tr>
   <tr><td class="dl">Aircraft type</td><td class="dv">${safeText(f.aircraftType)}</td></tr>
   <tr><td class="dl">Airport</td><td class="dv">${safeText(f.airport)}</td></tr>
   <tr><td class="dl">Gate</td><td class="dv" style="color:${f.gate === DISPLAY_DASH ? 'var(--muted)' : 'var(--text)'}">${safeText(f.gate)}</td></tr>
@@ -1969,7 +2140,7 @@ ${steps.map(s => `
 
                     const ac = f.aircraft || {};
                     const reg = extractRegistration(f);
-                    const shipNo = ac.modeS || ac.serialNo || ac.icao24 || DISPLAY_DASH;
+                    const shipNo = extractShipNumber(f);
                     const acType = ac.model || ac.type || ac.icaoCode || ac.iataCodeLong || DISPLAY_DASH;
                     const thisApt = isArr ? arr2 : dep;
                     const otherApt = isArr ? dep : arr2;
@@ -2002,6 +2173,7 @@ ${steps.map(s => `
                         _id: id,
                         _direction: isArr ? 'arrival' : 'departure',
                         _status: status,
+                        _codeshareStatus: f.codeshareStatus || DISPLAY_DASH,
                         _landedAt: safeLandedAt,
                         _departedAt: safeDepartedAt,
                         _scheduledArr: safeScheduledArr,
@@ -2029,6 +2201,7 @@ ${steps.map(s => `
                         _depDelay: normalizeDelay(dep.delay || dep.delayTime),
                         _arrDelay: normalizeDelay(arr2.delay || arr2.delayTime),
                         flight: f.number || f.iataNumber || DISPLAY_DASH,
+                        callSign: f.callSign || DISPLAY_DASH,
                         airline: f.airline?.name || DISPLAY_DASH,
                         reg, shipNo, acType,
                         aircraftType: acType,
@@ -2052,6 +2225,7 @@ ${steps.map(s => `
             else { process(raw.arrivals || [], 'arr'); process(raw.departures || [], 'dep'); }
 
             Object.values(byId).forEach(f => list.push(f));
+            enrichSiblingFlights(list);
 
             // Cross-match arrivals → departures within the same FIDS pull
             // (existing logic — still useful as a quick fallback before secondary call)
