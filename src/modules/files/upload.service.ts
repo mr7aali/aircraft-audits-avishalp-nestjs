@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { v2 as cloudinary } from 'cloudinary';
 
@@ -24,6 +24,8 @@ export class UploadService {
         infer: true,
       }) ?? '';
 
+    this.assertCloudinaryConfig(cloudName, apiKey, apiSecret);
+
     const timestamp = Math.floor(Date.now() / 1000);
     const payloadToSign = Object.fromEntries(
       Object.entries({
@@ -44,5 +46,28 @@ export class UploadService {
       cloud_name: cloudName,
       ...(payloadToSign.folder ? { folder: payloadToSign.folder } : {}),
     };
+  }
+
+  private assertCloudinaryConfig(
+    cloudName: string,
+    apiKey: string,
+    apiSecret: string,
+  ) {
+    const values = {
+      cloudName: cloudName.trim(),
+      apiKey: apiKey.trim(),
+      apiSecret: apiSecret.trim(),
+    };
+
+    const hasMissingValues = Object.values(values).some((value) => !value);
+    const hasPlaceholderValues = Object.values(values).some((value) =>
+      value.startsWith('your-'),
+    );
+
+    if (hasMissingValues || hasPlaceholderValues) {
+      throw new InternalServerErrorException(
+        'Cloudinary upload is not configured on the backend. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in the Nest .env file.',
+      );
+    }
   }
 }
