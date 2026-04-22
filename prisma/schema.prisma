@@ -53,6 +53,9 @@ model User {
   attendedOneOnOnes              EmployeeOneOnOne[]            @relation("EmployeeOneOnOnes")
   ledOneOnOnes                   EmployeeOneOnOne[]            @relation("LeaderOneOnOnes")
   endOfShiftReports              EndOfShiftReport[]
+  dynamicFormSubmissions         DynamicFormSubmission[]
+  dynamicFormTemplatesCreated    DynamicFormTemplate[]         @relation("DynamicFormTemplateCreatedBy")
+  dynamicFormTemplatesUpdated    DynamicFormTemplate[]         @relation("DynamicFormTemplateUpdatedBy")
   uploadedFiles                  File[]                        @relation("UserUploadedFiles")
   lavSafetyObservations          LavSafetyObservation[]
   loginAuditLogs                 LoginAuditLog[]
@@ -80,6 +83,8 @@ model Station {
   chatConversations            ChatConversation[]
   employeeOneOnOnes            EmployeeOneOnOne[]
   endOfShiftReports            EndOfShiftReport[]
+  dynamicFormSubmissions       DynamicFormSubmission[]
+  dynamicFormTemplates         DynamicFormTemplate[]
   gates                        Gate[]
   lavSafetyObservations        LavSafetyObservation[]
   shiftDefinitions             ShiftDefinition[]
@@ -788,6 +793,55 @@ model AppFeedback {
   @@map("app_feedback")
 }
 
+model DynamicFormTemplate {
+  id               String                    @id @default(uuid()) @db.Uuid
+  stationId        String                    @db.Uuid
+  createdByUserId  String                    @db.Uuid
+  updatedByUserId  String?                   @db.Uuid
+  title            String
+  description      String?
+  category         String?
+  formType         String
+  status           DynamicFormTemplateStatus @default(DRAFT)
+  version          Int                       @default(1)
+  questionCount    Int                       @default(0)
+  estimatedMinutes Int                       @default(0)
+  schemaJson       Json
+  publishedAt      DateTime?                 @db.Timestamptz(3)
+  archivedAt       DateTime?                 @db.Timestamptz(3)
+  createdAt        DateTime                  @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime                  @updatedAt @db.Timestamptz(3)
+  createdByUser    User                      @relation("DynamicFormTemplateCreatedBy", fields: [createdByUserId], references: [id])
+  station          Station                   @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  submissions      DynamicFormSubmission[]
+  updatedByUser    User?                     @relation("DynamicFormTemplateUpdatedBy", fields: [updatedByUserId], references: [id])
+
+  @@index([stationId, status, updatedAt])
+  @@index([createdByUserId, updatedAt])
+  @@map("dynamic_form_templates")
+}
+
+model DynamicFormSubmission {
+  id                String              @id @default(uuid()) @db.Uuid
+  templateId        String              @db.Uuid
+  stationId         String              @db.Uuid
+  submittedByUserId String              @db.Uuid
+  submittedByName   String
+  submittedByRole   String?
+  answersJson       Json
+  score             Decimal?            @db.Decimal(8, 2)
+  metadataJson      Json?
+  submittedAt       DateTime            @default(now()) @db.Timestamptz(3)
+  station           Station             @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  submittedByUser   User                @relation(fields: [submittedByUserId], references: [id])
+  template          DynamicFormTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([templateId, submittedAt])
+  @@index([stationId, submittedAt])
+  @@index([submittedByUserId, submittedAt])
+  @@map("dynamic_form_submissions")
+}
+
 model ChatConversation {
   id               String                        @id @default(uuid()) @db.Uuid
   conversationType ConversationType
@@ -1003,6 +1057,12 @@ enum ScanStatus {
 enum AuditRecordStatus {
   DRAFT
   SUBMITTED
+}
+
+enum DynamicFormTemplateStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
 }
 
 enum YesNoNa {

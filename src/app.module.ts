@@ -28,6 +28,7 @@ import { AdminDashboardModule } from './modules/admin-dashboard/admin-dashboard.
 import { HiddenObjectAuditsModule } from './modules/hidden-object-audits/hidden-object-audits.module.js';
 import { AccessControlModule } from './modules/access-control/access-control.module.js';
 import { FlightsModule } from './modules/flights/flights.module.js';
+import { DynamicFormsModule } from './modules/dynamic-forms/dynamic-forms.module.js';
 
 @Module({
   imports: [
@@ -130,6 +131,7 @@ import { FlightsModule } from './modules/flights/flights.module.js';
     HiddenObjectAuditsModule,
     AccessControlModule,
     FlightsModule,
+    DynamicFormsModule,
   ],
   providers: [
     {
