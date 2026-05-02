@@ -20,10 +20,22 @@ CREATE TYPE "ScanStatus" AS ENUM ('PENDING', 'CLEAN', 'INFECTED', 'FAILED');
 CREATE TYPE "AuditRecordStatus" AS ENUM ('DRAFT', 'SUBMITTED');
 
 -- CreateEnum
+CREATE TYPE "DynamicFormTemplateStatus" AS ENUM ('DRAFT', 'PUBLISHED', 'ARCHIVED');
+
+-- CreateEnum
 CREATE TYPE "YesNoNa" AS ENUM ('YES', 'NO', 'NA');
 
 -- CreateEnum
 CREATE TYPE "PassFail" AS ENUM ('PASS', 'FAIL');
+
+-- CreateEnum
+CREATE TYPE "HiddenObjectAuditStatus" AS ENUM ('SETUP', 'ACTIVE', 'CLOSED');
+
+-- CreateEnum
+CREATE TYPE "HiddenObjectLocationStatus" AS ENUM ('ORANGE', 'BLUE', 'GREEN', 'RED', 'PURPLE');
+
+-- CreateEnum
+CREATE TYPE "HiddenObjectLocationType" AS ENUM ('SEAT', 'GALLEY', 'LAV', 'JUMP_SEAT', 'ZONE');
 
 -- CreateEnum
 CREATE TYPE "DelayType" AS ENUM ('PRIMARY', 'SECONDARY');
@@ -33,6 +45,9 @@ CREATE TYPE "RatingScale" AS ENUM ('VERY_POOR', 'POOR', 'FAIR', 'GOOD', 'VERY_GO
 
 -- CreateEnum
 CREATE TYPE "ConversationType" AS ENUM ('DIRECT', 'GROUP');
+
+-- CreateEnum
+CREATE TYPE "SystemType" AS ENUM ('APP', 'ADMIN_DASHBOARD');
 
 -- CreateEnum
 CREATE TYPE "ConversationMemberRole" AS ENUM ('OWNER', 'ADMIN', 'MEMBER');
@@ -54,6 +69,7 @@ CREATE TABLE "roles" (
     "id" UUID NOT NULL,
     "code" TEXT NOT NULL,
     "name" TEXT NOT NULL,
+    "description" TEXT,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMPTZ(3) NOT NULL,
@@ -128,6 +144,10 @@ CREATE TABLE "app_modules" (
     "id" UUID NOT NULL,
     "code" TEXT NOT NULL,
     "name" TEXT NOT NULL,
+    "description" TEXT,
+    "routePath" TEXT,
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
+    "systemType" "SystemType" NOT NULL DEFAULT 'APP',
 
     CONSTRAINT "app_modules_pkey" PRIMARY KEY ("id")
 );
@@ -137,6 +157,10 @@ CREATE TABLE "role_module_access" (
     "id" UUID NOT NULL,
     "roleId" UUID NOT NULL,
     "moduleId" UUID NOT NULL,
+    "canRead" BOOLEAN NOT NULL DEFAULT false,
+    "canWrite" BOOLEAN NOT NULL DEFAULT false,
+    "canEdit" BOOLEAN NOT NULL DEFAULT false,
+    "canDelete" BOOLEAN NOT NULL DEFAULT false,
     "canList" BOOLEAN NOT NULL DEFAULT false,
     "canView" BOOLEAN NOT NULL DEFAULT false,
     "canCreate" BOOLEAN NOT NULL DEFAULT false,
@@ -178,6 +202,20 @@ CREATE TABLE "clean_types" (
     "isActive" BOOLEAN NOT NULL DEFAULT true,
 
     CONSTRAINT "clean_types_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "aircraft_types" (
+    "id" UUID NOT NULL,
+    "code" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "seatMapJson" JSONB,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
+
+    CONSTRAINT "aircraft_types_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -225,6 +263,7 @@ CREATE TABLE "account_recovery_requests" (
     "requestedEmail" TEXT NOT NULL,
     "recoveryType" "RecoveryType" NOT NULL,
     "tokenHash" TEXT,
+    "verificationCodeHash" TEXT,
     "expiresAt" TIMESTAMPTZ(3),
     "consumedAt" TIMESTAMPTZ(3),
     "status" "RecoveryStatus" NOT NULL DEFAULT 'REQUESTED',
@@ -290,6 +329,7 @@ CREATE TABLE "cabin_quality_audits" (
     "gateCodeSnapshot" TEXT NOT NULL,
     "cleanTypeSnapshot" TEXT NOT NULL,
     "auditAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "detailedResultsJson" JSONB,
     "otherFindings" TEXT,
     "additionalNotes" TEXT,
     "signatureFileId" UUID NOT NULL,
@@ -334,6 +374,7 @@ CREATE TABLE "lav_safety_checklist_items" (
     "id" UUID NOT NULL,
     "code" TEXT NOT NULL,
     "label" TEXT NOT NULL,
+    "description" TEXT,
     "sortOrder" INTEGER NOT NULL DEFAULT 0,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
 
@@ -404,6 +445,19 @@ CREATE TABLE "security_search_areas" (
 );
 
 -- CreateTable
+CREATE TABLE "fleet_aircraft" (
+    "id" UUID NOT NULL,
+    "shipNumber" TEXT NOT NULL,
+    "displayName" TEXT,
+    "aircraftTypeId" UUID NOT NULL,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
+
+    CONSTRAINT "fleet_aircraft_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "cabin_security_search_trainings" (
     "id" UUID NOT NULL,
     "stationId" UUID NOT NULL,
@@ -415,6 +469,7 @@ CREATE TABLE "cabin_security_search_trainings" (
     "gateCodeSnapshot" TEXT NOT NULL,
     "trainingAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "shipNumber" TEXT NOT NULL,
+    "detailedResultsJson" JSONB,
     "otherFindings" TEXT,
     "additionalNotes" TEXT,
     "overallResult" "PassFail" NOT NULL,
@@ -424,6 +479,59 @@ CREATE TABLE "cabin_security_search_trainings" (
     "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "cabin_security_search_trainings_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "hidden_object_audit_sessions" (
+    "id" UUID NOT NULL,
+    "stationId" UUID NOT NULL,
+    "shiftOccurrenceId" UUID,
+    "auditorUserId" UUID NOT NULL,
+    "auditorNameSnapshot" TEXT NOT NULL,
+    "auditorRoleSnapshot" TEXT NOT NULL,
+    "aircraftTypeId" UUID NOT NULL,
+    "aircraftTypeNameSnapshot" TEXT NOT NULL,
+    "fleetAircraftId" UUID NOT NULL,
+    "shipNumberSnapshot" TEXT NOT NULL,
+    "objectsToHideCount" INTEGER NOT NULL,
+    "sessionAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "setupCompletedAt" TIMESTAMPTZ(3),
+    "activatedAt" TIMESTAMPTZ(3),
+    "closedAt" TIMESTAMPTZ(3),
+    "status" "HiddenObjectAuditStatus" NOT NULL DEFAULT 'SETUP',
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
+
+    CONSTRAINT "hidden_object_audit_sessions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "hidden_object_audit_locations" (
+    "id" UUID NOT NULL,
+    "sessionId" UUID NOT NULL,
+    "locationCode" TEXT NOT NULL,
+    "locationLabel" TEXT NOT NULL,
+    "sectionLabel" TEXT NOT NULL,
+    "locationType" "HiddenObjectLocationType" NOT NULL,
+    "status" "HiddenObjectLocationStatus" NOT NULL DEFAULT 'ORANGE',
+    "subLocation" TEXT,
+    "hiddenConfirmedAt" TIMESTAMPTZ(3),
+    "foundAt" TIMESTAMPTZ(3),
+    "foundByUserId" UUID,
+    "foundByNameSnapshot" TEXT,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
+
+    CONSTRAINT "hidden_object_audit_locations_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "hidden_object_audit_location_files" (
+    "locationId" UUID NOT NULL,
+    "fileId" UUID NOT NULL,
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
+
+    CONSTRAINT "hidden_object_audit_location_files_pkey" PRIMARY KEY ("locationId","fileId")
 );
 
 -- CreateTable
@@ -546,6 +654,45 @@ CREATE TABLE "app_feedback" (
     "performanceIssues" TEXT,
 
     CONSTRAINT "app_feedback_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "dynamic_form_templates" (
+    "id" UUID NOT NULL,
+    "stationId" UUID NOT NULL,
+    "createdByUserId" UUID NOT NULL,
+    "updatedByUserId" UUID,
+    "title" TEXT NOT NULL,
+    "description" TEXT,
+    "category" TEXT,
+    "formType" TEXT NOT NULL,
+    "status" "DynamicFormTemplateStatus" NOT NULL DEFAULT 'DRAFT',
+    "version" INTEGER NOT NULL DEFAULT 1,
+    "questionCount" INTEGER NOT NULL DEFAULT 0,
+    "estimatedMinutes" INTEGER NOT NULL DEFAULT 0,
+    "schemaJson" JSONB NOT NULL,
+    "publishedAt" TIMESTAMPTZ(3),
+    "archivedAt" TIMESTAMPTZ(3),
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
+
+    CONSTRAINT "dynamic_form_templates_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "dynamic_form_submissions" (
+    "id" UUID NOT NULL,
+    "templateId" UUID NOT NULL,
+    "stationId" UUID NOT NULL,
+    "submittedByUserId" UUID NOT NULL,
+    "submittedByName" TEXT NOT NULL,
+    "submittedByRole" TEXT,
+    "answersJson" JSONB NOT NULL,
+    "score" DECIMAL(8,2),
+    "metadataJson" JSONB,
+    "submittedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "dynamic_form_submissions_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -731,6 +878,9 @@ CREATE UNIQUE INDEX "shift_occurrences_stationId_shiftDefinitionId_businessDate_
 CREATE UNIQUE INDEX "clean_types_code_key" ON "clean_types"("code");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "aircraft_types_code_key" ON "aircraft_types"("code");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "files_storageKey_key" ON "files"("storageKey");
 
 -- CreateIndex
@@ -753,6 +903,9 @@ CREATE UNIQUE INDEX "account_recovery_requests_tokenHash_key" ON "account_recove
 
 -- CreateIndex
 CREATE INDEX "account_recovery_requests_requestedEmail_createdAt_idx" ON "account_recovery_requests"("requestedEmail", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "account_recovery_requests_requestedEmail_recoveryType_statu_idx" ON "account_recovery_requests"("requestedEmail", "recoveryType", "status", "createdAt");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "email_notifications_providerMessageId_key" ON "email_notifications"("providerMessageId");
@@ -824,6 +977,12 @@ CREATE INDEX "lav_safety_observation_files_fileId_idx" ON "lav_safety_observatio
 CREATE UNIQUE INDEX "security_search_areas_code_key" ON "security_search_areas"("code");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "fleet_aircraft_shipNumber_key" ON "fleet_aircraft"("shipNumber");
+
+-- CreateIndex
+CREATE INDEX "fleet_aircraft_aircraftTypeId_idx" ON "fleet_aircraft"("aircraftTypeId");
+
+-- CreateIndex
 CREATE INDEX "cabin_security_search_trainings_stationId_trainingAt_idx" ON "cabin_security_search_trainings"("stationId", "trainingAt");
 
 -- CreateIndex
@@ -834,6 +993,30 @@ CREATE INDEX "cabin_security_search_trainings_overallResult_idx" ON "cabin_secur
 
 -- CreateIndex
 CREATE INDEX "cabin_security_search_trainings_status_idx" ON "cabin_security_search_trainings"("status");
+
+-- CreateIndex
+CREATE INDEX "hidden_object_audit_sessions_stationId_sessionAt_idx" ON "hidden_object_audit_sessions"("stationId", "sessionAt");
+
+-- CreateIndex
+CREATE INDEX "hidden_object_audit_sessions_auditorUserId_idx" ON "hidden_object_audit_sessions"("auditorUserId");
+
+-- CreateIndex
+CREATE INDEX "hidden_object_audit_sessions_status_idx" ON "hidden_object_audit_sessions"("status");
+
+-- CreateIndex
+CREATE INDEX "hidden_object_audit_sessions_aircraftTypeId_idx" ON "hidden_object_audit_sessions"("aircraftTypeId");
+
+-- CreateIndex
+CREATE INDEX "hidden_object_audit_locations_sessionId_status_idx" ON "hidden_object_audit_locations"("sessionId", "status");
+
+-- CreateIndex
+CREATE INDEX "hidden_object_audit_locations_foundByUserId_idx" ON "hidden_object_audit_locations"("foundByUserId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "hidden_object_audit_locations_sessionId_locationCode_key" ON "hidden_object_audit_locations"("sessionId", "locationCode");
+
+-- CreateIndex
+CREATE INDEX "hidden_object_audit_location_files_fileId_idx" ON "hidden_object_audit_location_files"("fileId");
 
 -- CreateIndex
 CREATE INDEX "cabin_security_search_training_results_areaId_idx" ON "cabin_security_search_training_results"("areaId");
@@ -888,6 +1071,21 @@ CREATE INDEX "app_feedback_stationId_submittedAt_idx" ON "app_feedback"("station
 
 -- CreateIndex
 CREATE INDEX "app_feedback_submittedByUserId_idx" ON "app_feedback"("submittedByUserId");
+
+-- CreateIndex
+CREATE INDEX "dynamic_form_templates_stationId_status_updatedAt_idx" ON "dynamic_form_templates"("stationId", "status", "updatedAt");
+
+-- CreateIndex
+CREATE INDEX "dynamic_form_templates_createdByUserId_updatedAt_idx" ON "dynamic_form_templates"("createdByUserId", "updatedAt");
+
+-- CreateIndex
+CREATE INDEX "dynamic_form_submissions_templateId_submittedAt_idx" ON "dynamic_form_submissions"("templateId", "submittedAt");
+
+-- CreateIndex
+CREATE INDEX "dynamic_form_submissions_stationId_submittedAt_idx" ON "dynamic_form_submissions"("stationId", "submittedAt");
+
+-- CreateIndex
+CREATE INDEX "dynamic_form_submissions_submittedByUserId_submittedAt_idx" ON "dynamic_form_submissions"("submittedByUserId", "submittedAt");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "chat_conversations_directPairKey_key" ON "chat_conversations"("directPairKey");
@@ -1055,6 +1253,9 @@ ALTER TABLE "lav_safety_observation_files" ADD CONSTRAINT "lav_safety_observatio
 ALTER TABLE "lav_safety_observation_files" ADD CONSTRAINT "lav_safety_observation_files_observationId_fkey" FOREIGN KEY ("observationId") REFERENCES "lav_safety_observations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "fleet_aircraft" ADD CONSTRAINT "fleet_aircraft_aircraftTypeId_fkey" FOREIGN KEY ("aircraftTypeId") REFERENCES "aircraft_types"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "cabin_security_search_trainings" ADD CONSTRAINT "cabin_security_search_trainings_auditorUserId_fkey" FOREIGN KEY ("auditorUserId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -1065,6 +1266,33 @@ ALTER TABLE "cabin_security_search_trainings" ADD CONSTRAINT "cabin_security_sea
 
 -- AddForeignKey
 ALTER TABLE "cabin_security_search_trainings" ADD CONSTRAINT "cabin_security_search_trainings_stationId_fkey" FOREIGN KEY ("stationId") REFERENCES "stations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "hidden_object_audit_sessions" ADD CONSTRAINT "hidden_object_audit_sessions_aircraftTypeId_fkey" FOREIGN KEY ("aircraftTypeId") REFERENCES "aircraft_types"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "hidden_object_audit_sessions" ADD CONSTRAINT "hidden_object_audit_sessions_auditorUserId_fkey" FOREIGN KEY ("auditorUserId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "hidden_object_audit_sessions" ADD CONSTRAINT "hidden_object_audit_sessions_fleetAircraftId_fkey" FOREIGN KEY ("fleetAircraftId") REFERENCES "fleet_aircraft"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "hidden_object_audit_sessions" ADD CONSTRAINT "hidden_object_audit_sessions_shiftOccurrenceId_fkey" FOREIGN KEY ("shiftOccurrenceId") REFERENCES "shift_occurrences"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "hidden_object_audit_sessions" ADD CONSTRAINT "hidden_object_audit_sessions_stationId_fkey" FOREIGN KEY ("stationId") REFERENCES "stations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "hidden_object_audit_locations" ADD CONSTRAINT "hidden_object_audit_locations_foundByUserId_fkey" FOREIGN KEY ("foundByUserId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "hidden_object_audit_locations" ADD CONSTRAINT "hidden_object_audit_locations_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "hidden_object_audit_sessions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "hidden_object_audit_location_files" ADD CONSTRAINT "hidden_object_audit_location_files_fileId_fkey" FOREIGN KEY ("fileId") REFERENCES "files"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "hidden_object_audit_location_files" ADD CONSTRAINT "hidden_object_audit_location_files_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "hidden_object_audit_locations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "cabin_security_search_training_results" ADD CONSTRAINT "cabin_security_search_training_results_areaId_fkey" FOREIGN KEY ("areaId") REFERENCES "security_search_areas"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -1125,6 +1353,24 @@ ALTER TABLE "app_feedback" ADD CONSTRAINT "app_feedback_stationId_fkey" FOREIGN 
 
 -- AddForeignKey
 ALTER TABLE "app_feedback" ADD CONSTRAINT "app_feedback_submittedByUserId_fkey" FOREIGN KEY ("submittedByUserId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "dynamic_form_templates" ADD CONSTRAINT "dynamic_form_templates_createdByUserId_fkey" FOREIGN KEY ("createdByUserId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "dynamic_form_templates" ADD CONSTRAINT "dynamic_form_templates_stationId_fkey" FOREIGN KEY ("stationId") REFERENCES "stations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "dynamic_form_templates" ADD CONSTRAINT "dynamic_form_templates_updatedByUserId_fkey" FOREIGN KEY ("updatedByUserId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "dynamic_form_submissions" ADD CONSTRAINT "dynamic_form_submissions_stationId_fkey" FOREIGN KEY ("stationId") REFERENCES "stations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "dynamic_form_submissions" ADD CONSTRAINT "dynamic_form_submissions_submittedByUserId_fkey" FOREIGN KEY ("submittedByUserId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "dynamic_form_submissions" ADD CONSTRAINT "dynamic_form_submissions_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "dynamic_form_templates"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "chat_conversations" ADD CONSTRAINT "chat_conversations_avatarFileId_fkey" FOREIGN KEY ("avatarFileId") REFERENCES "files"("id") ON DELETE SET NULL ON UPDATE CASCADE;

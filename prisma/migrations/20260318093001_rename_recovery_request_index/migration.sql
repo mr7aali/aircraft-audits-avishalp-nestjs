@@ -1,2 +1,0 @@
--- RenameIndex
-ALTER INDEX "account_recovery_requests_requestedEmail_recoveryType_status_cr" RENAME TO "account_recovery_requests_requestedEmail_recoveryType_statu_idx";
