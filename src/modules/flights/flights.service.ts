@@ -12,14 +12,25 @@ import { AuthenticatedUser } from '../../common/types/authenticated-user.type.js
 import { ListStationFlightsDto } from './dto/list-station-flights.dto.js';
 
 type ExternalFlightRecord = Record<string, unknown>;
+type ProviderFlightsPayload = {
+  arrivals: ExternalFlightRecord[];
+  departures: ExternalFlightRecord[];
+};
 
 interface RedisClientLike {
   get(key: string): Promise<string | null>;
-  set(key: string, value: string, mode: 'EX', ttlSeconds: number): Promise<unknown>;
+  set(
+    key: string,
+    value: string,
+    mode: 'EX',
+    ttlSeconds: number,
+  ): Promise<unknown>;
   disconnect(): void;
 }
 
 interface FlightView {
+  id: string;
+  direction: 'arrival' | 'departure';
   airlineName: string;
   flightNumber: string;
   departureAirport: string;
@@ -46,6 +57,9 @@ interface CachedStationFlights {
   arrivals: FlightView[];
   departures: FlightView[];
   totalFlights: number;
+  providerStationCode: string;
+  windowStart: string;
+  windowEnd: string;
 }
 
 interface MemoryCacheEntry {
@@ -57,8 +71,145 @@ interface MemoryCacheEntry {
 export class FlightsService implements OnModuleDestroy {
   private readonly logger = new Logger(FlightsService.name);
   private readonly memoryCache = new Map<string, MemoryCacheEntry>();
-  private readonly inFlightRequests = new Map<string, Promise<CachedStationFlights>>();
+  private readonly inFlightRequests = new Map<
+    string,
+    Promise<CachedStationFlights>
+  >();
   private redisClientPromise: Promise<RedisClientLike | null> | null = null;
+  private readonly iataToIcao: Record<string, string> = {
+    JFK: 'KJFK',
+    LAX: 'KLAX',
+    ORD: 'KORD',
+    ATL: 'KATL',
+    DFW: 'KDFW',
+    DEN: 'KDEN',
+    SFO: 'KSFO',
+    SEA: 'KSEA',
+    LAS: 'KLAS',
+    MIA: 'KMIA',
+    CLT: 'KCLT',
+    PHX: 'KPHX',
+    IAH: 'KIAH',
+    MCO: 'KMCO',
+    EWR: 'KEWR',
+    MSP: 'KMSP',
+    DTW: 'KDTW',
+    BOS: 'KBOS',
+    PHL: 'KPHL',
+    LGA: 'KLGA',
+    BWI: 'KBWI',
+    SLC: 'KSLC',
+    SAN: 'KSAN',
+    IAD: 'KIAD',
+    DCA: 'KDCA',
+    MDW: 'KMDW',
+    HNL: 'PHNL',
+    ANC: 'PANC',
+    PDX: 'KPDX',
+    STL: 'KSTL',
+    LHR: 'EGLL',
+    LGW: 'EGKK',
+    STN: 'EGSS',
+    LTN: 'EGGW',
+    MAN: 'EGCC',
+    EDI: 'EGPH',
+    CDG: 'LFPG',
+    ORY: 'LFPO',
+    AMS: 'EHAM',
+    FRA: 'EDDF',
+    MUC: 'EDDM',
+    BER: 'EDDB',
+    MAD: 'LEMD',
+    BCN: 'LEBL',
+    FCO: 'LIRF',
+    MXP: 'LIMC',
+    ZRH: 'LSZH',
+    VIE: 'LOWW',
+    CPH: 'EKCH',
+    ARN: 'ESSA',
+    HEL: 'EFHK',
+    OSL: 'ENGM',
+    LIS: 'LPPT',
+    DUB: 'EIDW',
+    ATH: 'LGAV',
+    IST: 'LTFM',
+    SAW: 'LTFJ',
+    BRU: 'EBBR',
+    WAW: 'EPWA',
+    PRG: 'LKPR',
+    BUD: 'LHBP',
+    OTP: 'LROP',
+    SOF: 'LBSF',
+    DXB: 'OMDB',
+    AUH: 'OMAA',
+    DOH: 'OTHH',
+    KWI: 'OKBK',
+    BAH: 'OBBI',
+    AMM: 'OJAI',
+    BEY: 'OLBA',
+    TLV: 'LLBG',
+    RUH: 'OERK',
+    JED: 'OEJN',
+    MCT: 'OOMS',
+    SIN: 'WSSS',
+    KUL: 'WMKK',
+    BKK: 'VTBS',
+    HKG: 'VHHH',
+    ICN: 'RKSI',
+    NRT: 'RJAA',
+    HND: 'RJTT',
+    PEK: 'ZBAA',
+    PVG: 'ZSPD',
+    CAN: 'ZGGG',
+    CTU: 'ZUUU',
+    XIY: 'ZLXY',
+    DEL: 'VIDP',
+    BOM: 'VABB',
+    MAA: 'VOMM',
+    HYD: 'VOHS',
+    BLR: 'VOBL',
+    CCU: 'VECC',
+    CGP: 'VGEG',
+    DAC: 'VGHS',
+    CMB: 'VCBI',
+    KTM: 'VNKT',
+    MNL: 'RPLL',
+    CGK: 'WIII',
+    DPS: 'WADD',
+    KHI: 'OPKC',
+    LHE: 'OPLA',
+    ISB: 'OPIS',
+    ZYL: 'VGSY',
+    CXB: 'VGCB',
+    JSR: 'VGJR',
+    BZL: 'VGBR',
+    RJH: 'VGRJ',
+    CAI: 'HECA',
+    JNB: 'FAOR',
+    CPT: 'FACT',
+    NBO: 'HKJK',
+    ADD: 'HAAB',
+    LOS: 'DNMM',
+    ACC: 'DGAA',
+    CMN: 'GMMN',
+    TUN: 'DTTA',
+    ALG: 'DAAG',
+    YYZ: 'CYYZ',
+    YVR: 'CYVR',
+    YUL: 'CYUL',
+    YYC: 'CYYC',
+    YEG: 'CYEG',
+    GRU: 'SBGR',
+    BOG: 'SKBO',
+    LIM: 'SPIM',
+    SCL: 'SCEL',
+    EZE: 'SAEZ',
+    MEX: 'MMMX',
+    SYD: 'YSSY',
+    MEL: 'YMML',
+    BNE: 'YBBN',
+    AKL: 'NZAA',
+  };
 
   constructor(
     private readonly prisma: PrismaService,
@@ -84,6 +235,7 @@ export class FlightsService implements OnModuleDestroy {
       select: {
         id: true,
         code: true,
+        airportCode: true,
         name: true,
         timezone: true,
         isActive: true,
@@ -95,10 +247,15 @@ export class FlightsService implements OnModuleDestroy {
     }
 
     const stationCode = station.code.trim().toUpperCase();
-    const limit = this.resolveLimit(query.limit);
-    const cacheKey = `flights:active:${stationCode}:limit:${limit}`;
+    const providerStationCode = this.resolveIcaoCode(
+      station.airportCode || stationCode,
+    );
+    const timeWindow = this.buildProviderTimeWindow(station.timezone);
+    const cacheKey = `flights:active:v2:${stationCode}:${providerStationCode}`;
     const cached =
-      query.forceRefresh === true ? null : await this.getCachedFlights(cacheKey);
+      query.forceRefresh === true
+        ? null
+        : await this.getCachedFlights(cacheKey);
 
     if (cached) {
       return this.toClientResponse(cached, 'cache');
@@ -107,9 +264,11 @@ export class FlightsService implements OnModuleDestroy {
     const fresh = await this.loadFreshFlights(cacheKey, {
       stationId: station.id,
       stationCode,
+      providerStationCode,
       stationName: station.name,
       timezone: station.timezone,
-      limit,
+      windowStart: timeWindow.startStr,
+      windowEnd: timeWindow.endStr,
     });
 
     return this.toClientResponse(fresh, 'origin');
@@ -122,7 +281,9 @@ export class FlightsService implements OnModuleDestroy {
       stationCode: string;
       stationName: string;
       timezone: string;
-      limit: number;
+      providerStationCode: string;
+      windowStart: string;
+      windowEnd: string;
     },
   ) {
     const existing = this.inFlightRequests.get(cacheKey);
@@ -131,10 +292,11 @@ export class FlightsService implements OnModuleDestroy {
     }
 
     const request = (async () => {
-      const rawFlights = await this.fetchProviderFlights(
-        context.stationCode,
-        context.limit,
-      );
+      const rawFlights = await this.fetchProviderFlights({
+        icaoCode: context.providerStationCode,
+        windowStart: context.windowStart,
+        windowEnd: context.windowEnd,
+      });
       const cached = this.normalizeFlights(rawFlights, context);
       await this.setCachedFlights(cacheKey, cached);
       return cached;
@@ -151,60 +313,17 @@ export class FlightsService implements OnModuleDestroy {
     }
   }
 
-  private async fetchProviderFlights(stationCode: string, limit: number) {
-    const activeStatus =
-      this.configService.get<string>('aviationstack.activeStatus', {
-        infer: true,
-      }) ?? 'active';
-
-    const [arrivalFlights, departureFlights] = await Promise.all([
-      this.requestProvider({
-        stationCode,
-        limit,
-        direction: 'arrival',
-        flightStatus: activeStatus.trim() || undefined,
-      }),
-      this.requestProvider({
-        stationCode,
-        limit,
-        direction: 'departure',
-        flightStatus: activeStatus.trim() || undefined,
-      }),
-    ]);
-
-    if (arrivalFlights.length > 0 || departureFlights.length > 0) {
-      return [...arrivalFlights, ...departureFlights];
-    }
-
-    const [fallbackArrivalFlights, fallbackDepartureFlights] = await Promise.all([
-      this.requestProvider({
-        stationCode,
-        limit,
-        direction: 'arrival',
-      }),
-      this.requestProvider({
-        stationCode,
-        limit,
-        direction: 'departure',
-      }),
-    ]);
-
-    return [...fallbackArrivalFlights, ...fallbackDepartureFlights];
-  }
-
-  private async requestProvider({
-    stationCode,
-    limit,
-    direction,
-    flightStatus,
+  private async fetchProviderFlights({
+    icaoCode,
+    windowStart,
+    windowEnd,
   }: {
-    stationCode: string;
-    limit: number;
-    direction: 'arrival' | 'departure';
-    flightStatus?: string;
-  }) {
+    icaoCode: string;
+    windowStart: string;
+    windowEnd: string;
+  }): Promise<ProviderFlightsPayload> {
     const apiKey =
-      this.configService.get<string>('aviationstack.apiKey', { infer: true }) ??
+      this.configService.get<string>('aerodatabox.apiKey', { infer: true }) ??
       '';
     if (!apiKey.trim()) {
       throw new ServiceUnavailableException(
@@ -213,29 +332,41 @@ export class FlightsService implements OnModuleDestroy {
     }
 
     const baseUrl =
-      this.configService.get<string>('aviationstack.baseUrl', {
+      this.configService.get<string>('aerodatabox.baseUrl', {
         infer: true,
-      }) ?? 'http://api.aviationstack.com/v1/flights';
-    const timeoutMs =
-      this.configService.get<number>('flights.providerTimeoutMs', {
+      }) ?? 'https://aerodatabox.p.rapidapi.com/flights/airports/icao';
+    const rapidApiHost =
+      this.configService.get<string>('aerodatabox.host', { infer: true }) ??
+      'aerodatabox.p.rapidapi.com';
+    const configuredTimeoutMs = this.configService.get<number>(
+      'flights.providerTimeoutMs',
+      {
         infer: true,
-      }) ?? 15000;
-
-    const url = new URL(baseUrl);
-    url.searchParams.set('access_key', apiKey.trim());
-    url.searchParams.set(
-      direction === 'arrival' ? 'arr_iata' : 'dep_iata',
-      stationCode,
+      },
     );
-    url.searchParams.set('limit', String(limit));
+    const timeoutMs = Number.isFinite(Number(configuredTimeoutMs))
+      ? Number(configuredTimeoutMs)
+      : 15000;
 
-    if ((flightStatus?.trim().length ?? 0) > 0) {
-      url.searchParams.set('flight_status', flightStatus!.trim());
-    }
+    const url = new URL(
+      `${baseUrl.replace(/\/$/, '')}/${encodeURIComponent(
+        icaoCode,
+      )}/${encodeURIComponent(windowStart)}/${encodeURIComponent(windowEnd)}`,
+    );
+    url.searchParams.set('withLeg', 'true');
+    url.searchParams.set('direction', 'Both');
+    url.searchParams.set('withCancelled', 'false');
+    url.searchParams.set('withCodeshared', 'true');
+    url.searchParams.set('withCargo', 'false');
+    url.searchParams.set('withPrivate', 'false');
 
     let response: Response;
     try {
       response = await fetch(url, {
+        headers: {
+          'x-rapidapi-host': rapidApiHost.trim(),
+          'x-rapidapi-key': apiKey.trim(),
+        },
         signal: AbortSignal.timeout(timeoutMs),
       });
     } catch {
@@ -270,49 +401,58 @@ export class FlightsService implements OnModuleDestroy {
       throw new BadGatewayException(message);
     }
 
-    if (
-      typeof payload !== 'object' ||
-      payload === null ||
-      !('data' in payload) ||
-      !Array.isArray((payload as { data?: unknown }).data)
-    ) {
-      throw new BadGatewayException('Flight provider returned an invalid payload');
+    if (typeof payload !== 'object' || payload === null) {
+      throw new BadGatewayException(
+        'Flight provider returned an invalid payload',
+      );
     }
 
-    return (payload as { data: ExternalFlightRecord[] }).data;
+    const responsePayload = payload as Record<string, unknown>;
+    return {
+      arrivals: Array.isArray(responsePayload.arrivals)
+        ? (responsePayload.arrivals as ExternalFlightRecord[])
+        : [],
+      departures: Array.isArray(responsePayload.departures)
+        ? (responsePayload.departures as ExternalFlightRecord[])
+        : [],
+    };
   }
 
   private normalizeFlights(
-    rawFlights: ExternalFlightRecord[],
+    rawFlights: ProviderFlightsPayload,
     context: {
       stationId: string;
       stationCode: string;
       stationName: string;
       timezone: string;
+      providerStationCode: string;
+      windowStart: string;
+      windowEnd: string;
     },
   ): CachedStationFlights {
-    const mappedFlights = rawFlights
-      .map((entry) => this.mapExternalFlight(entry))
-      .filter((entry): entry is FlightView => entry != null);
+    const mappedFlights = [
+      ...rawFlights.arrivals.map((entry) =>
+        this.mapAeroDataBoxFlight(entry, 'arrival', context),
+      ),
+      ...rawFlights.departures.map((entry) =>
+        this.mapAeroDataBoxFlight(entry, 'departure', context),
+      ),
+    ].filter((entry): entry is FlightView => entry != null);
 
     const deduplicated = new Map<string, FlightView>();
     for (const flight of mappedFlights) {
-      const flightNumber = flight.flightNumber.trim();
-      if (!flightNumber) {
+      if (!flight.id.trim()) {
         continue;
       }
-      if (!deduplicated.has(flightNumber)) {
-        deduplicated.set(flightNumber, flight);
+      if (!deduplicated.has(flight.id)) {
+        deduplicated.set(flight.id, flight);
       }
     }
 
-    const stationCode = context.stationCode.trim().toUpperCase();
     const flights = [...deduplicated.values()];
-    const arrivals = flights.filter(
-      (flight) => flight.arrivalIata.trim().toUpperCase() === stationCode,
-    );
+    const arrivals = flights.filter((flight) => flight.direction === 'arrival');
     const departures = flights.filter(
-      (flight) => flight.departureIata.trim().toUpperCase() === stationCode,
+      (flight) => flight.direction === 'departure',
     );
 
     this.sortFlightsByTime(arrivals, (flight) => flight.arrivalTime);
@@ -333,36 +473,181 @@ export class FlightsService implements OnModuleDestroy {
       arrivals,
       departures,
       totalFlights: arrivals.length + departures.length,
+      providerStationCode: context.providerStationCode,
+      windowStart: context.windowStart,
+      windowEnd: context.windowEnd,
     };
   }
 
-  private mapExternalFlight(entry: ExternalFlightRecord): FlightView {
+  private mapAeroDataBoxFlight(
+    entry: ExternalFlightRecord,
+    direction: 'arrival' | 'departure',
+    context: {
+      stationCode: string;
+      stationName: string;
+      providerStationCode: string;
+    },
+  ): FlightView {
     const airline = this.asRecord(entry.airline);
-    const flight = this.asRecord(entry.flight);
     const departure = this.asRecord(entry.departure);
     const arrival = this.asRecord(entry.arrival);
     const aircraft = this.asRecord(entry.aircraft);
+    const departureAirport = this.asRecord(departure.airport);
+    const arrivalAirport = this.asRecord(arrival.airport);
 
-    const flightIata = this.asString(flight.iata);
-    const flightIcao = this.asString(flight.icao);
-    const flightNumber = flightIata || flightIcao || 'N/A';
+    const flightNumber =
+      this.asString(entry.number) || this.asString(entry.iataNumber) || 'N/A';
+    const departureTime =
+      this.parseDateTime(this.extractProviderTime(departure.scheduledTime)) ??
+      this.parseDateTime(this.extractProviderTime(departure.revisedTime)) ??
+      this.parseDateTime(this.extractProviderTime(departure.runwayTime));
+    const arrivalTime =
+      this.parseDateTime(this.extractProviderTime(arrival.scheduledTime)) ??
+      this.parseDateTime(this.extractProviderTime(arrival.revisedTime)) ??
+      this.parseDateTime(this.extractProviderTime(arrival.runwayTime));
+
+    const aircraftRegistration =
+      this.asString(aircraft.reg) ||
+      this.asString(aircraft.registration) ||
+      this.asString(aircraft.tail) ||
+      this.asString(aircraft.number) ||
+      this.asString(entry.reg) ||
+      this.asString(entry.registration);
+    const shipNumber =
+      this.asString(aircraft.modeS) ||
+      this.asString(aircraft.modes) ||
+      this.asString(aircraft.mode_s) ||
+      this.asString(aircraft.icao24) ||
+      this.asString(aircraft.hex) ||
+      this.asString(aircraft.serialNo) ||
+      this.asString(entry.modeS) ||
+      this.asString(entry.icao24) ||
+      this.asString(entry.hex) ||
+      aircraftRegistration ||
+      'N/A';
+    const status = this.normalizeAeroDataBoxStatus(entry, direction);
+    const anchor = direction === 'arrival' ? arrivalTime : departureTime;
+    const departureIata = this.resolveAirportCode({
+      airport: departureAirport,
+      direction,
+      stationSide: 'departure',
+      context,
+    });
+    const arrivalIata = this.resolveAirportCode({
+      airport: arrivalAirport,
+      direction,
+      stationSide: 'arrival',
+      context,
+    });
+    const departureGate =
+      this.asString(departure.gate) || this.asString(arrival.gate) || '—';
+    const arrivalGate =
+      this.asString(arrival.gate) || this.asString(departure.gate) || '—';
+    const departureTerminal =
+      this.asString(departure.terminal) || this.asString(arrival.terminal) || '—';
+    const arrivalTerminal =
+      this.asString(arrival.terminal) || this.asString(departure.terminal) || '—';
 
     return {
+      id: [
+        direction,
+        flightNumber.replace(/\s+/g, ''),
+        anchor ?? this.asString(entry.id) ?? '',
+      ].join('|'),
+      direction,
       airlineName: this.asString(airline.name) || 'Unknown Airline',
       flightNumber,
-      departureAirport: this.asString(departure.airport) || 'N/A',
-      departureIata: this.asString(departure.iata) || 'N/A',
-      departureTime: this.parseDateTime(departure.scheduled),
-      departureTerminal: this.asString(departure.terminal) || 'N/A',
-      departureGate: this.asString(departure.gate) || 'N/A',
-      arrivalAirport: this.asString(arrival.airport) || 'N/A',
-      arrivalIata: this.asString(arrival.iata) || 'N/A',
-      arrivalTime: this.parseDateTime(arrival.scheduled),
-      arrivalTerminal: this.asString(arrival.terminal) || 'N/A',
-      arrivalGate: this.asString(arrival.gate) || 'N/A',
-      status: this.asString(entry.flight_status) || 'unknown',
-      shipNumber: this.asString(aircraft.registration) || 'N/A',
+      departureAirport:
+        this.asString(departureAirport.name) ||
+        (direction === 'departure' ? context.stationName : '—'),
+      departureIata,
+      departureTime,
+      departureTerminal,
+      departureGate,
+      arrivalAirport:
+        this.asString(arrivalAirport.name) ||
+        (direction === 'arrival' ? context.stationName : '—'),
+      arrivalIata,
+      arrivalTime,
+      arrivalTerminal,
+      arrivalGate,
+      status,
+      shipNumber,
     };
+  }
+
+  private resolveAirportCode({
+    airport,
+    direction,
+    stationSide,
+    context,
+  }: {
+    airport: ExternalFlightRecord;
+    direction: 'arrival' | 'departure';
+    stationSide: 'arrival' | 'departure';
+    context: {
+      stationCode: string;
+      providerStationCode: string;
+    };
+  }) {
+    const iata = this.asString(airport.iata);
+    const icao = this.asString(airport.icao);
+    if (iata) {
+      return iata;
+    }
+    if (icao && icao.toUpperCase() !== context.providerStationCode) {
+      return icao;
+    }
+    if (direction === stationSide) {
+      return context.stationCode;
+    }
+    return icao || '—';
+  }
+
+  private normalizeAeroDataBoxStatus(
+    entry: ExternalFlightRecord,
+    direction: 'arrival' | 'departure',
+  ) {
+    const rawStatus = this.asString(entry.status).toLowerCase();
+    const departure = this.asRecord(entry.departure);
+    const arrival = this.asRecord(entry.arrival);
+    const landedAt =
+      this.extractProviderTime(arrival.runwayTime) ||
+      this.extractProviderTime(arrival.actualTime);
+    const departedAt =
+      this.extractProviderTime(departure.runwayTime) ||
+      this.extractProviderTime(departure.actualTime);
+
+    if (rawStatus.includes('cancel')) {
+      return 'cancelled';
+    }
+    if (rawStatus.includes('delay')) {
+      return 'delayed';
+    }
+    if (rawStatus.includes('land') || rawStatus.includes('arrived')) {
+      return 'landed';
+    }
+    if (
+      rawStatus.includes('ground') ||
+      rawStatus.includes('boarding') ||
+      rawStatus.includes('taxi')
+    ) {
+      return 'on-ground';
+    }
+    if (
+      rawStatus.includes('depart') ||
+      rawStatus.includes('airborne') ||
+      rawStatus.includes('en-route')
+    ) {
+      return 'departed';
+    }
+    if (direction === 'arrival' && landedAt) {
+      return 'on-ground';
+    }
+    if (direction === 'departure' && departedAt) {
+      return 'departed';
+    }
+    return direction === 'arrival' ? 'approaching' : 'scheduled';
   }
 
   private sortFlightsByTime(
@@ -407,6 +692,9 @@ export class FlightsService implements OnModuleDestroy {
       stationCode: payload.stationCode,
       stationName: payload.stationName,
       timezone: payload.timezone,
+      providerStationCode: payload.providerStationCode,
+      windowStart: payload.windowStart,
+      windowEnd: payload.windowEnd,
       arrivals: payload.arrivals,
       departures: payload.departures,
       totalFlights: payload.totalFlights,
@@ -504,7 +792,9 @@ export class FlightsService implements OnModuleDestroy {
           lazyConnect: true,
         });
       } catch {
-        this.logger.warn('Redis client initialization failed, using memory cache');
+        this.logger.warn(
+          'Redis client initialization failed, using memory cache',
+        );
         return null;
       }
     })();
@@ -513,9 +803,13 @@ export class FlightsService implements OnModuleDestroy {
   }
 
   private getCacheTtlSeconds() {
-    const configured = this.configService.get<number>('flights.cacheTtlSeconds', {
-      infer: true,
-    });
+    const configuredValue = this.configService.get<number>(
+      'flights.cacheTtlSeconds',
+      {
+        infer: true,
+      },
+    );
+    const configured = Number(configuredValue);
     if (!configured || !Number.isFinite(configured)) {
       return 300;
     }
@@ -532,18 +826,53 @@ export class FlightsService implements OnModuleDestroy {
     return Math.max(0, Math.ceil(remainingMs / 1000));
   }
 
-  private resolveLimit(limit?: number) {
-    if (limit && Number.isFinite(limit)) {
-      return Math.min(Math.max(Math.trunc(limit), 1), 100);
+  private resolveIcaoCode(stationCode: string) {
+    const normalized = stationCode.trim().toUpperCase();
+    if (normalized.length === 4) {
+      return normalized;
+    }
+    return this.iataToIcao[normalized] ?? normalized;
+  }
+
+  private buildProviderTimeWindow(timezone: string) {
+    const now = new Date();
+    const start = new Date(now.getTime() - 6 * 60 * 60 * 1000);
+    const end = new Date(now.getTime() + 6 * 60 * 60 * 1000);
+
+    return {
+      startStr: this.formatDateTimeForProvider(start, timezone),
+      endStr: this.formatDateTimeForProvider(end, timezone),
+    };
+  }
+
+  private formatDateTimeForProvider(value: Date, timezone: string) {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone || 'UTC',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    })
+      .formatToParts(value)
+      .reduce<Record<string, string>>((accumulator, part) => {
+        if (part.type !== 'literal') {
+          accumulator[part.type] = part.value;
+        }
+        return accumulator;
+      }, {});
+
+    return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+  }
+
+  private extractProviderTime(value: unknown) {
+    if (typeof value === 'string') {
+      return value;
     }
 
-    const configured = this.configService.get<number>('flights.providerLimit', {
-      infer: true,
-    });
-    if (!configured || !Number.isFinite(configured)) {
-      return 100;
-    }
-    return Math.min(Math.max(Math.trunc(configured), 1), 100);
+    const record = this.asRecord(value);
+    return this.asString(record.local) || this.asString(record.utc) || null;
   }
 
   private parseDateTime(value: unknown) {
@@ -552,7 +881,8 @@ export class FlightsService implements OnModuleDestroy {
       return null;
     }
 
-    const parsed = new Date(raw);
+    const normalized = raw.includes('T') ? raw : raw.replace(' ', 'T');
+    const parsed = new Date(normalized);
     if (Number.isNaN(parsed.getTime())) {
       return null;
     }

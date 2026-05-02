@@ -32,6 +32,13 @@ export default () => ({
       'http://api.aviationstack.com/v1/flights',
     activeStatus: process.env.AVIATIONSTACK_ACTIVE_STATUS ?? 'active',
   },
+  aerodatabox: {
+    apiKey: process.env.AERODATABOX_RAPIDAPI_KEY ?? '',
+    host: process.env.AERODATABOX_RAPIDAPI_HOST ?? 'aerodatabox.p.rapidapi.com',
+    baseUrl:
+      process.env.AERODATABOX_BASE_URL ??
+      'https://aerodatabox.p.rapidapi.com/flights/airports/icao',
+  },
   mail: {
     from: process.env.MAIL_FROM ?? 'noreply@example.com',
     host: process.env.MAIL_HOST ?? 'localhost',
