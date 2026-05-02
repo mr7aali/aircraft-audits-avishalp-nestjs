@@ -26,6 +26,11 @@ export const envValidationSchema = Joi.object({
     .uri({ scheme: [/https?/] })
     .default('http://api.aviationstack.com/v1/flights'),
   AVIATIONSTACK_ACTIVE_STATUS: Joi.string().default('active'),
+  AERODATABOX_RAPIDAPI_KEY: Joi.string().allow('').optional(),
+  AERODATABOX_RAPIDAPI_HOST: Joi.string().default('aerodatabox.p.rapidapi.com'),
+  AERODATABOX_BASE_URL: Joi.string()
+    .uri({ scheme: [/https?/] })
+    .default('https://aerodatabox.p.rapidapi.com/flights/airports/icao'),
   MAIL_FROM: Joi.string().email().default('noreply@example.com'),
   MAIL_HOST: Joi.string().default('localhost'),
   MAIL_PORT: Joi.number().default(1025),
